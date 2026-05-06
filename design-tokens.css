@@ -1,0 +1,49 @@
+/**
+ * OmniWTMS Design Tokens
+ * Structural template aligned with UAE Private Investor.
+ * No brand colors – each platform keeps its own palette.
+ */
+
+:root {
+  /* Spacing scale (px) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+
+  /* Typography – hierarchy */
+  --text-hero: clamp(2rem, 4vw, 3.5rem);      /* H1 – hero titles */
+  --text-section: clamp(1.5rem, 2.5vw, 2.25rem); /* H2 – section titles */
+  --text-subsection: clamp(1.125rem, 1.5vw, 1.5rem); /* H3 – subsection */
+  --text-body: 1rem;                          /* Body */
+  --text-small: 0.875rem;
+
+  --font-weight-hero: 800;
+  --font-weight-section: 700;
+  --font-weight-subsection: 600;
+  --font-weight-body: 400;
+
+  /* Border radius */
+  --radius-standard: 12px;
+  --radius-card: 12px;
+  --radius-button: 12px;
+  --radius-input: 12px;
+
+  /* Shadow depth */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Container width – UAE-style */
+  --container-main: 1200px;
+  --container-wide: 1400px;
+  --container-narrow: 896px;
+
+  /* Section vertical rhythm */
+  --section-py: 64px;   /* 4rem / space-6 */
+  --section-py-sm: 48px;
+  --section-py-lg: 80px;
+}

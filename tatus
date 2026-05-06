@@ -1,0 +1,77 @@
+[1mdiff --git a/components/CookieConsent.tsx b/components/CookieConsent.tsx[m
+[1mindex 09f3acb..5930567 100644[m
+[1m--- a/components/CookieConsent.tsx[m
+[1m+++ b/components/CookieConsent.tsx[m
+[36m@@ -16,10 +16,19 @@[m [mexport default function CookieConsent() {[m
+     setIsMounted(true);[m
+     [m
+     // Check if consent was already given[m
+[31m-    const consentGiven = localStorage.getItem('cookie-consent');[m
+[31m-    [m
+[31m-    if (!consentGiven) {[m
+[31m-      // Only show banner if consent hasn't been given[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const consentGiven = localStorage.getItem('cookie-consent');[m
+[32m+[m[41m      [m
+[32m+[m[32m      if (!consentGiven) {[m
+[32m+[m[32m        // Only show banner if consent hasn't been given[m
+[32m+[m[32m        setIsVisible(true);[m
+[32m+[m[32m      } else {[m
+[32m+[m[32m        // Ensure banner is hidden if consent was given[m
+[32m+[m[32m        setIsVisible(false);[m
+[32m+[m[32m      }[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      // If localStorage is not available, show the banner[m
+[32m+[m[32m      console.warn('localStorage not available:', error);[m
+       setIsVisible(true);[m
+     }[m
+     [m
+[36m@@ -39,12 +48,29 @@[m [mexport default function CookieConsent() {[m
+   }, []);[m
+   [m
+   const acceptAll = () => {[m
+[31m-    localStorage.setItem('cookie-consent', 'all');[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      localStorage.setItem('cookie-consent', 'all');[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.warn('Failed to save cookie consent to localStorage:', error);[m
+[32m+[m[32m    }[m
+     setIsVisible(false);[m
+   };[m
+   [m
+   const acceptEssential = () => {[m
+[31m-    localStorage.setItem('cookie-consent', 'essential');[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      localStorage.setItem('cookie-consent', 'essential');[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.warn('Failed to save cookie consent to localStorage:', error);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    setIsVisible(false);[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const closeBanner = () => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      localStorage.setItem('cookie-consent', 'dismissed');[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.warn('Failed to save cookie consent to localStorage:', error);[m
+[32m+[m[32m    }[m
+     setIsVisible(false);[m
+   };[m
+ [m
+[36m@@ -63,7 +89,15 @@[m [mexport default function CookieConsent() {[m
+           transition={{ duration: 0.4 }}[m
+           className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-blue-100 shadow-lg w-full"[m
+         >[m
+[31m-          <div className={`w-full max-w-7xl mx-auto px-3 py-4 ${isPixel8Width ? 'px-2 py-3' : 'sm:p-4 md:p-6'}`}>[m
+[32m+[m[32m          <div className={`w-full max-w-7xl mx-auto px-3 py-4 ${isPixel8Width ? 'px-2 py-3' : 'sm:p-4 md:p-6'} relative`}>[m
+[32m+[m[32m            {/* Close button */}[m
+[32m+[m[32m            <button[m[41m [m
+[32m+[m[32m              onClick={closeBanner}[m
+[32m+[m[32m              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"[m
+[32m+[m[32m              aria-label="Close cookie banner"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              <X className="h-5 w-5" />[m
+[32m+[m[32m            </button>[m
+             <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4">[m
+               <div className="bg-blue-100 p-2 sm:p-3 rounded-full hidden sm:block">[m
+                 <Cookie className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />[m

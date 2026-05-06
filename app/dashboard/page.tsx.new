@@ -1,0 +1,457 @@
+// @ts-nocheck
+"use client";
+
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine
+} from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Package, Truck, Warehouse, TrendingUp, ArrowLeftRight, PackageX, TrendingDown, Clock, AlertCircle, CheckCircle2, Activity, BarChart3, Thermometer, Droplets, Wind, CloudRain, Sun, CloudSun, Moon, CloudMoon, Cloud } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "react-hot-toast";
+import { useRouter } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+interface WarehouseActivity {
+  date: string;
+  productName: string;
+  warehouseName: string;
+  quantity: number;
+  type: string;
+}
+
+interface DashboardStats {
+  products: {
+    total: number;
+    daily: Array<{ date: string; count: number }>;
+    trend: number;
+    addedToday: number;
+    addedYesterday: number;
+    addedThisWeek: number;
+    value: number;
+    lowStock: number;
+  };
+  deliveries: {
+    total: number;
+    byStatus: Record<string, number>;
+    daily: Array<{ date: string; count: number; isPrediction?: boolean }>;
+  };
+  couriers: {
+    total: number;
+    active: number;
+    daily: Array<{ date: string; count: number }>;
+    byStatus: Record<string, number>;
+    totalDeliveries: number;
+    averageCapacity: number;
+  };
+  warehouse: {
+    total: number;
+    byStatus: Record<string, number>;
+    utilization: Array<{ name: string; utilization: number }>;
+    totalWarehouses: number;
+    totalStocks: number;
+    stocksByWarehouse: Array<{ name: string; quantity: number }>;
+    movementStats: {
+      totalAssignments: number;
+      totalTransfers: number;
+      totalRemovals: number;
+    };
+    operations?: Array<{
+      vehicleRegistration?: string;
+      customerName?: string;
+      driverName?: string;
+      vehicleSize?: string;
+      loadType?: string;
+      arrivalTime?: string;
+      warehouseName?: string;
+      description?: string;
+      quantity?: number;
+      condition?: string;
+      qualityStatus?: string;
+      damageImage?: string;
+      supervisor?: string;
+      aisle?: string;
+      bay?: string;
+      level?: string;
+      position?: string;
+      warehouseLocation?: string;
+    }>;
+    operationsByType?: {
+      assignments: number;
+      transfers: number;
+      removals: number;
+      inventoryUploads: number;
+    };
+    totalOperations: number;
+    activityData?: Array<{ date: string; count: number }>;
+    dailyOperations?: number;
+    weeklyOperations?: number;
+    monthlyOperations?: number;
+    trendPercentage?: number;
+    utilizationPercentage?: number;
+  };
+}
+
+interface InventoryMovement {
+  id: string;
+  warehouse_id: string;
+  product_id: string;
+  quantity: number;
+  movement_type: 'in' | 'out' | 'transfer';
+  reference_number: string;
+  notes: string;
+  performed_by: string;
+  timestamp: string;
+  warehouses?: {
+    name: string;
+  };
+  products?: {
+    name: string;
+    sku: string;
+  };
+}
+
+const calculateTotalStocks = (warehouses: any[]) => {
+  return warehouses.reduce((total, warehouse) => {
+    const warehouseStocks = warehouse.stocks || [];
+    const stocksTotal = warehouseStocks.reduce((sum: number, stock: any) => {
+      return sum + (stock.quantity || 0);
+    }, 0);
+    return total + stocksTotal;
+  }, 0);
+};
+
+const processStocksByWarehouse = (warehouses: any[]) => {
+  return warehouses.map(warehouse => ({
+    name: warehouse.name,
+    quantity: (warehouse.stocks || []).reduce((sum: number, stock: any) => 
+      sum + (stock.quantity || 0), 0
+    )
+  }));
+};
+
+const processWarehouseUtilization = (warehouses: any[]) => {
+  return warehouses.map(warehouse => {
+    const totalStock = (warehouse.stocks || []).reduce((sum: number, stock: any) => 
+      sum + (stock.quantity || 0), 0
+    );
+    const capacity = warehouse.capacity || 100;
+    const utilization = (totalStock / capacity) * 100;
+    return {
+      name: warehouse.name,
+      utilization: Math.min(utilization, 100)
+    };
+  });
+};
+
+const inspectDatabase = async (supabase: any) => {
+  console.log('🔍 Starting Database Inspection');
+
+  try {
+    const { data: couriersInfo, error: couriersError } = await supabase
+      .from('courier')
+      .select('*')
+      .limit(1);
+
+    if (couriersError || !couriersInfo) {
+      const { data: couriersInfo2, error: couriersError2 } = await supabase
+        .from('couriers')
+        .select('*')
+        .limit(1);
+      
+      console.log('🚚 Couriers Table Structure:', 
+        couriersInfo2 ? Object.keys(couriersInfo2[0] || {}) : 'No data',
+        'Error:', couriersError2,
+        'Raw Data:', couriersInfo2
+      );
+    } else {
+      console.log('🚚 Couriers Table Structure:', 
+        Object.keys(couriersInfo[0] || {}),
+        'Raw Data:', couriersInfo
+      );
+    }
+
+    const { data: warehousesInfo, error: warehousesError } = await supabase
+      .from('warehouses')
+      .select('*')
+      .limit(1);
+
+    console.log('🏭 Warehouses Table Structure:', 
+      warehousesInfo ? Object.keys(warehousesInfo[0] || {}) : 'No data',
+      'Error:', warehousesError,
+      'Raw Data:', warehousesInfo
+    );
+
+    const { data: productsInfo, error: productsError } = await supabase
+      .from('products')
+      .select('*')
+      .limit(1);
+
+    console.log('📦 Products Table Structure:', 
+      productsInfo ? Object.keys(productsInfo[0] || {}) : 'No data',
+      'Error:', productsError,
+      'Raw Data:', productsInfo
+    );
+
+    const { data: deliveriesInfo, error: deliveriesError } = await supabase
+      .from('deliveries')
+      .select('*')
+      .limit(1);
+
+    console.log('🚚 Deliveries Table Structure:', 
+      deliveriesInfo ? Object.keys(deliveriesInfo[0] || {}) : 'No data',
+      'Error:', deliveriesError,
+      'Raw Data:', deliveriesInfo
+    );
+
+    const { data: inventoryMovementsInfo, error: inventoryMovementsError } = await supabase
+      .from('inventory_movements')
+      .select('*')
+      .limit(1);
+
+    console.log('📦 Inventory Movements Table Structure:', 
+      inventoryMovementsInfo ? Object.keys(inventoryMovementsInfo[0] || {}) : 'No data',
+      'Error:', inventoryMovementsError,
+      'Raw Data:', inventoryMovementsInfo
+    );
+
+    const { data: stocksInfo, error: stocksError } = await supabase
+      .from('stocks')
+      .select('*')
+      .limit(1);
+
+    console.log('📦 Stocks Table Structure:', 
+      stocksInfo ? Object.keys(stocksInfo[0] || {}) : 'No data',
+      'Error:', stocksError,
+      'Raw Data:', stocksInfo
+    );
+
+    const { data: rolesInfo, error: rolesError } = await supabase
+      .from('roles')
+      .select('*')
+      .limit(1);
+
+    console.log('👥 Roles Table Structure:', 
+      rolesInfo ? Object.keys(rolesInfo[0] || {}) : 'No data',
+      'Error:', rolesError,
+      'Raw Data:', rolesInfo
+    );
+
+    const { data: extensionsInfo, error: extensionsError } = await supabase.rpc('get_extension_names');
+    console.log('🔌 Extensions:', extensionsInfo, 'Error:', extensionsError);
+
+    const { data: triggersInfo, error: triggersError } = await supabase.rpc('get_trigger_names');
+    console.log('🔔 Triggers:', triggersInfo, 'Error:', triggersError);
+
+    console.log('✅ Database Inspection Complete');
+  } catch (error) {
+    console.error('❌ Error during database inspection:', error);
+  }
+};
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        await inspectDatabase(supabase);
+
+        // Fetch all required data
+        const [
+          productsResponse,
+          deliveriesResponse,
+          couriersResponse,
+          warehousesResponse,
+          inventoryMovementsResponse
+        ] = await Promise.all([
+          supabase.from('products').select('*'),
+          supabase.from('deliveries').select('*'),
+          supabase.from('couriers').select('*'),
+          supabase.from('warehouses').select('*, stocks(*)'),
+          supabase.from('inventory_movements').select('*')
+        ]);
+
+        if (productsResponse.error) throw productsResponse.error;
+        if (deliveriesResponse.error) throw deliveriesResponse.error;
+        if (couriersResponse.error) throw couriersResponse.error;
+        if (warehousesResponse.error) throw warehousesResponse.error;
+        if (inventoryMovementsResponse.error) throw inventoryMovementsResponse.error;
+
+        const products = productsResponse.data;
+        const deliveries = deliveriesResponse.data;
+        const couriers = couriersResponse.data;
+        const warehouses = warehousesResponse.data;
+        const inventoryMovements = inventoryMovementsResponse.data;
+
+        // Process the data and update stats
+        setStats({
+          products: {
+            total: products.length,
+            daily: [], // You'll need to implement this
+            trend: 0, // You'll need to implement this
+            addedToday: 0, // You'll need to implement this
+            addedYesterday: 0, // You'll need to implement this
+            addedThisWeek: 0, // You'll need to implement this
+            value: 0, // You'll need to implement this
+            lowStock: 0 // You'll need to implement this
+          },
+          deliveries: {
+            total: deliveries.length,
+            byStatus: {}, // You'll need to implement this
+            daily: [] // You'll need to implement this
+          },
+          couriers: {
+            total: couriers.length,
+            active: 0, // You'll need to implement this
+            daily: [], // You'll need to implement this
+            byStatus: {}, // You'll need to implement this
+            totalDeliveries: 0, // You'll need to implement this
+            averageCapacity: 0 // You'll need to implement this
+          },
+          warehouse: {
+            total: warehouses.length,
+            byStatus: {}, // You'll need to implement this
+            utilization: processWarehouseUtilization(warehouses),
+            totalWarehouses: warehouses.length,
+            totalStocks: calculateTotalStocks(warehouses),
+            stocksByWarehouse: processStocksByWarehouse(warehouses),
+            movementStats: {
+              totalAssignments: 0, // You'll need to implement this
+              totalTransfers: 0, // You'll need to implement this
+              totalRemovals: 0 // You'll need to implement this
+            }
+          }
+        });
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
+  if (!stats) {
+    return <div>No data available</div>;
+  }
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      
+      {/* Products Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.products.total}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Deliveries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.deliveries.total}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Couriers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.couriers.total}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Warehouses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.warehouse.total}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Warehouse Utilization */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Warehouse Utilization</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stats.warehouse.utilization.map((warehouse, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle>{warehouse.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Progress value={warehouse.utilization} />
+                <div className="mt-2 text-sm text-gray-500">
+                  {warehouse.utilization.toFixed(1)}% utilized
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Stocks by Warehouse */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Stocks by Warehouse</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stats.warehouse.stocksByWarehouse.map((warehouse, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle>{warehouse.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{warehouse.quantity}</div>
+                <div className="text-sm text-gray-500">items in stock</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+} 

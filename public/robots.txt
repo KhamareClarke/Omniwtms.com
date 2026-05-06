@@ -1,0 +1,24 @@
+# robots.txt for OmniWTMS
+User-agent: *
+Allow: /
+
+# Disallow admin and private areas
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /private/
+
+# Allow specific crawlers full access
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap location
+Sitemap: https://omniwtms.com/sitemap.xml
+Sitemap: https://omniwtms.com/sitemap-0.xml
+
+# Crawl delay (optional, helps prevent server overload)
+Crawl-delay: 1

@@ -1,0 +1,208 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, Play, ArrowRight, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import SignupModal from './SignupModal';
+import Image from 'next/image';
+
+export default function HeroSection() {
+  // State management
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [currentTaglineIndex, setCurrentTaglineIndex] = useState(0);
+  const [proofVisible, setProofVisible] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Rotating taglines
+  const taglines = [
+    'From Pallet to Doorstep.',
+    'Total Control of Logistics.',
+    'One Platform, Every Operation.'
+  ];
+
+  useEffect(() => {
+    // Show proof elements with delay
+    const timer = setTimeout(() => setProofVisible(true), 1500);
+    
+    // Word rotation effect
+    const wordInterval = setInterval(() => {
+      setCurrentTaglineIndex((prev: number) => (prev + 1) % taglines.length);
+    }, 3000);
+    
+    // Canvas animation for data visualization
+    let animationFrame: number | undefined;
+    
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const dataPoints: {x: number, y: number}[] = [];
+        
+        const drawDataLine = () => {
+          if (!ctx) return;
+          
+          // Add new data point
+          if (dataPoints.length > 100) dataPoints.shift();
+          dataPoints.push({ 
+            x: dataPoints.length, 
+            y: 50 + Math.sin(dataPoints.length / 5) * 20 + (Math.random() * 10 - 5) 
+          });
+          
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw line
+          ctx.beginPath();
+          ctx.moveTo(0, dataPoints[0]?.y || 0);
+          dataPoints.forEach((point, i) => {
+            ctx.lineTo(i * (canvas.width / 100), point.y);
+          });
+          ctx.strokeStyle = 'rgba(0, 72, 255, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Add subtle glow
+          ctx.beginPath();
+          ctx.moveTo(0, dataPoints[0]?.y || 0);
+          dataPoints.forEach((point, i) => {
+            ctx.lineTo(i * (canvas.width / 100), point.y);
+          });
+          ctx.strokeStyle = 'rgba(0, 150, 255, 0.2)';
+          ctx.lineWidth = 6;
+          ctx.stroke();
+          
+          animationFrame = requestAnimationFrame(drawDataLine);
+        };
+        
+        drawDataLine();
+      }
+    }
+    
+    return () => {
+      clearTimeout(timer);
+      clearInterval(wordInterval);
+      if (animationFrame !== undefined) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, []);
+
+  const handleDemoClick = () => {
+    setIsSignupModalOpen(true);
+  };
+
+  return (
+    <div className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
+      <div className="absolute top-0 left-0 w-full h-full bg-grid-pattern opacity-5"></div>
+      
+      {/* Main Content Container */}
+      <div className="container max-w-7xl mx-auto px-4 relative z-10">
+        <div className="text-center max-w-4xl mx-auto mb-16">
+          {/* Headline */}
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 tracking-tight">
+            Warehouse Management,{" "}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
+              Reimagined
+            </span>
+          </h1>
+          
+          {/* Rotating Tagline */}
+          <h2 className="h-10 text-xl md:text-2xl text-gray-600 font-medium mt-4 relative">
+            {taglines[currentTaglineIndex]}
+          </h2>
+          
+          {/* Concise Value Proposition */}
+          <p className="text-lg text-gray-600 mt-6 max-w-3xl mx-auto">
+            OmniWTMS delivers end-to-end visibility and control for modern logistics operations.
+            Streamline your warehouse operations with our powerful, intuitive platform.
+          </p>
+          
+          {/* Desktop CTA Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white py-6 px-8 text-lg font-medium relative overflow-hidden group active:scale-95 transition-all duration-300"
+              onClick={handleDemoClick}
+            >
+              <span className="relative flex items-center">
+                Request Demo
+                <ArrowRight className="w-5 h-5 ml-2 transition-transform" />
+              </span>
+            </Button>
+          </div>
+          
+          {/* Sticky Mobile CTA */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg shadow-lg z-50 px-4 py-3 flex gap-2 border-t border-gray-200 animate-slide-up-delayed">
+            <Button 
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 text-sm relative overflow-hidden group active:scale-95 transition-all duration-300"
+              onClick={handleDemoClick}
+            >
+              <span className="relative flex items-center justify-center">
+                <Play className="w-4 h-4 mr-2" />
+                Get Started
+              </span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1 border-blue-600 text-blue-600 hover:bg-blue-50 py-3 text-sm active:scale-95 transition-all duration-300"
+              onClick={handleDemoClick}
+            >
+              <span className="flex items-center justify-center">
+                Learn More
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </span>
+            </Button>
+          </div>
+
+          {/* Proof Stack */}
+          <div className={`transition-all duration-1000 ${proofVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <div className="flex flex-wrap justify-center gap-6 text-sm font-medium mt-8">
+              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-gray-700">Launch in 48 Hours</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-gray-700">GDPR & ISO 27001 Compliant</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-gray-700">100% Cloud-Based</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Metrics - Consolidated Unique Value Props */}
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div className="relative animate-fade-in hover-lift cursor-pointer bg-white/40 backdrop-blur-sm p-4 rounded-lg shadow-sm">
+              <Zap className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+              <div className="text-sm text-gray-700 font-medium mb-1">99.5% Picking Accuracy</div>
+            </div>
+            <div className="relative animate-fade-in delay-100 hover-lift cursor-pointer bg-white/40 backdrop-blur-sm p-4 rounded-lg shadow-sm">
+              <TrendingUp className="w-6 h-6 text-green-500 mx-auto mb-2" />
+              <div className="text-sm text-gray-700 font-medium mb-1">40% Faster Deliveries</div>
+            </div>
+            <div className="relative animate-fade-in delay-200 hover-lift cursor-pointer bg-white/40 backdrop-blur-sm p-4 rounded-lg shadow-sm">
+              <CheckCircle className="w-6 h-6 text-orange-500 mx-auto mb-2" />
+              <div className="text-sm text-gray-700 font-medium mb-1">3X Order Processing</div>
+            </div>
+            <div className="relative animate-fade-in delay-300 hover-lift cursor-pointer bg-white/40 backdrop-blur-sm p-4 rounded-lg shadow-sm">
+              <BarChart3 className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+              <div className="text-sm text-gray-700 font-medium mb-1">Live GPS Vehicle Tracking</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Canvas for data visualization */}
+      <div className="absolute bottom-0 left-0 w-full h-24 opacity-25">
+        <canvas ref={canvasRef} className="w-full h-full"></canvas>
+      </div>
+      
+      {/* Signup Modal */}
+      <SignupModal 
+        isOpen={isSignupModalOpen}
+        onClose={() => setIsSignupModalOpen(false)}
+      />
+    </div>
+  );
+}
