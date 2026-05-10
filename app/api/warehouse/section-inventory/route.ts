@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
+import { sectionBelongsToTenant } from "@/lib/tenants/warehouse-scope";
 
 // POST - Move stock to a section
 export async function POST(request: NextRequest) {
+  const t = requireTenantId(request);
+  if (t instanceof NextResponse) return t;
   try {
-    const supabase = createClient();
+    const supabase = createAdminServiceClient();
     const body = await request.json();
     const { section_id, product_id, quantity, notes } = body;
 
@@ -15,11 +19,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get section capacity and enforce over-allocation prevention
+    const okSec = await sectionBelongsToTenant(supabase, section_id, t.tenantId);
+    if (!okSec) {
+      return NextResponse.json({ error: "Section not found" }, { status: 404 });
+    }
+
     const { data: section, error: sectionErr } = await supabase
       .from("warehouse_sections")
       .select("id, capacity")
       .eq("id", section_id)
+      .eq("tenant_id", t.tenantId)
       .single();
 
     if (sectionErr || !section) {
@@ -30,7 +39,8 @@ export async function POST(request: NextRequest) {
     const { data: currentInventory } = await supabase
       .from("section_inventory")
       .select("quantity")
-      .eq("section_id", section_id);
+      .eq("section_id", section_id)
+      .eq("tenant_id", t.tenantId);
 
     const currentTotal = currentInventory?.reduce((sum, inv) => sum + (inv.quantity || 0), 0) ?? 0;
     if (capacity > 0 && currentTotal + quantity > capacity) {
@@ -43,17 +53,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if inventory already exists for this section and product
     const { data: existingInventory } = await supabase
       .from("section_inventory")
       .select("id, quantity")
       .eq("section_id", section_id)
       .eq("product_id", product_id)
+      .eq("tenant_id", t.tenantId)
       .single();
 
     let inventory;
     if (existingInventory) {
-      // Update existing inventory
       const { data, error } = await supabase
         .from("section_inventory")
         .update({
@@ -62,13 +71,13 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingInventory.id)
+        .eq("tenant_id", t.tenantId)
         .select()
         .single();
 
       if (error) throw error;
       inventory = data;
     } else {
-      // Create new inventory entry
       const { data, error } = await supabase
         .from("section_inventory")
         .insert({
@@ -76,6 +85,7 @@ export async function POST(request: NextRequest) {
           product_id,
           quantity,
           notes,
+          tenant_id: t.tenantId,
         })
         .select()
         .single();
@@ -84,16 +94,14 @@ export async function POST(request: NextRequest) {
       inventory = data;
     }
 
-    // Update section current_usage
     const { data: allInventory } = await supabase
       .from("section_inventory")
       .select("quantity")
-      .eq("section_id", section_id);
+      .eq("section_id", section_id)
+      .eq("tenant_id", t.tenantId);
 
-    const totalQuantity = allInventory?.reduce(
-      (sum, inv) => sum + (inv.quantity || 0),
-      0
-    ) || 0;
+    const totalQuantity =
+      allInventory?.reduce((sum, inv) => sum + (inv.quantity || 0), 0) || 0;
 
     await supabase
       .from("warehouse_sections")
@@ -101,21 +109,22 @@ export async function POST(request: NextRequest) {
         current_usage: totalQuantity,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", section_id);
+      .eq("id", section_id)
+      .eq("tenant_id", t.tenantId);
 
     return NextResponse.json({ inventory });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
 // GET - Get inventory for a section
 export async function GET(request: NextRequest) {
+  const t = requireTenantId(request);
+  if (t instanceof NextResponse) return t;
   try {
-    const supabase = createClient();
+    const supabase = createAdminServiceClient();
     const { searchParams } = new URL(request.url);
     const sectionId = searchParams.get("section_id");
 
@@ -124,6 +133,11 @@ export async function GET(request: NextRequest) {
         { error: "section_id is required" },
         { status: 400 }
       );
+    }
+
+    const ok = await sectionBelongsToTenant(supabase, sectionId, t.tenantId);
+    if (!ok) {
+      return NextResponse.json({ error: "Section not found" }, { status: 404 });
     }
 
     const { data: inventory, error } = await supabase
@@ -138,6 +152,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq("section_id", sectionId)
+      .eq("tenant_id", t.tenantId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -148,11 +163,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ inventory: inventory || [] });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

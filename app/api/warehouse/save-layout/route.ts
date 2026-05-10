@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
+import { warehouseBelongsToTenant } from "@/lib/tenants/warehouse-scope";
 
 /**
  * POST /api/warehouse/save-layout
  * Saves layout and sections in one request.
- * Body: { warehouse_id, image_url?, image_width?, image_height?, grid_rows?, grid_columns?, sections?: [...] }
  */
 export async function POST(request: NextRequest) {
+  const t = requireTenantId(request);
+  if (t instanceof NextResponse) return t;
   try {
-    const supabase = createClient();
+    const supabase = createAdminServiceClient();
     const body = await request.json();
     const {
       warehouse_id,
@@ -27,11 +30,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Get or create layout
+    const allowed = await warehouseBelongsToTenant(supabase, warehouse_id, t.tenantId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Warehouse not found" }, { status: 404 });
+    }
+
     const { data: existingLayout } = await supabase
       .from("warehouse_layouts")
       .select("id")
       .eq("warehouse_id", warehouse_id)
+      .eq("tenant_id", t.tenantId)
       .limit(1)
       .single();
 
@@ -51,7 +59,8 @@ export async function POST(request: NextRequest) {
       const { error: updateError } = await supabase
         .from("warehouse_layouts")
         .update(updates)
-        .eq("id", layoutId);
+        .eq("id", layoutId)
+        .eq("tenant_id", t.tenantId);
 
       if (updateError) throw updateError;
     } else {
@@ -71,6 +80,7 @@ export async function POST(request: NextRequest) {
           image_height: image_height ?? null,
           grid_rows: grid_rows ?? 10,
           grid_columns: grid_columns ?? 10,
+          tenant_id: t.tenantId,
         })
         .select("id")
         .single();
@@ -79,7 +89,6 @@ export async function POST(request: NextRequest) {
       layoutId = newLayout.id;
     }
 
-    // 2. Upsert sections
     const savedSections: unknown[] = [];
     for (const s of sections) {
       const {
@@ -93,10 +102,7 @@ export async function POST(request: NextRequest) {
         notes,
       } = s;
 
-      if (
-        row_index === undefined ||
-        column_index === undefined
-      ) {
+      if (row_index === undefined || column_index === undefined) {
         continue;
       }
 
@@ -104,11 +110,12 @@ export async function POST(request: NextRequest) {
         .from("warehouse_sections")
         .select("id")
         .eq("layout_id", layoutId)
+        .eq("tenant_id", t.tenantId)
         .eq("row_index", row_index)
         .eq("column_index", column_index)
         .single();
 
-      const sectionPayload = {
+      const sectionPayload: Record<string, unknown> = {
         layout_id: layoutId,
         row_index,
         column_index,
@@ -126,6 +133,7 @@ export async function POST(request: NextRequest) {
           .from("warehouse_sections")
           .update(sectionPayload)
           .eq("id", existingSection.id)
+          .eq("tenant_id", t.tenantId)
           .select()
           .single();
 
@@ -134,7 +142,7 @@ export async function POST(request: NextRequest) {
       } else {
         const { data: inserted, error } = await supabase
           .from("warehouse_sections")
-          .insert(sectionPayload)
+          .insert({ ...sectionPayload, tenant_id: t.tenantId })
           .select()
           .single();
 
@@ -143,11 +151,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Fetch full layout
     const { data: layout, error: layoutError } = await supabase
       .from("warehouse_layouts")
       .select("*")
       .eq("id", layoutId)
+      .eq("tenant_id", t.tenantId)
       .single();
 
     if (layoutError) throw layoutError;

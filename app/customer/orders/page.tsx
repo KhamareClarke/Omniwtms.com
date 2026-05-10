@@ -164,7 +164,14 @@ export default function OrdersPage() {
       router.push("/auth/login");
       return;
     }
-    setCustomer(JSON.parse(customerStr));
+    const c = JSON.parse(customerStr);
+    setCustomer(c);
+    fetch("/api/auth/sync-tenant", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId: c.id }),
+    }).catch(() => {});
   }, [router]);
 
   useEffect(() => {
@@ -177,7 +184,8 @@ export default function OrdersPage() {
     setOrdersLoading(true);
     try {
       const res = await fetch(
-        `/api/customer/orders?customer_id=${encodeURIComponent(customerId)}`
+        `/api/customer/orders?customer_id=${encodeURIComponent(customerId)}`,
+        { credentials: "include" }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "@/lib/auth/SupabaseClient";
 import {
   Card,
   CardContent,
@@ -108,12 +108,6 @@ export default function ReportsPage() {
     },
     timeline: [],
   });
-  const supabase = createClientComponentClient({
-    supabaseUrl: "https://qpkaklmbiwitlroykjim.supabase.co",
-    supabaseKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MTM4NjIsImV4cCI6MjA1MjM4OTg2Mn0.4y_ogmlsnMMXCaISQeVo-oS6zDJnyAVEeAo6p7Ms97U",
-  });
-
   useEffect(() => {
     fetchReportData();
   }, [dateRange, reportType]);

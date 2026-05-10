@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { supabase as supabaseBrowser } from "@/lib/auth/SupabaseClient";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,12 +38,14 @@ import {
 } from "lucide-react";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import { WhiteLabelLayout } from "@/components/layout/WhiteLabelLayout";
+import type { PublicTenantBranding } from "@/lib/tenants/branding-types";
 
-// Initialize Supabase client
+// Server-style checks on login only (existing pattern). Dashboard uses anon + RLS via supabaseBrowser.
 const supabaseUrl = "https://qpkaklmbiwitlroykjim.supabase.co";
-const supabaseKey =
+const supabaseServiceKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
 // Animated gradient background component - optimized for performance
 const AnimatedBackground = () => (
@@ -178,6 +181,18 @@ export default function LoginPage() {
   const [clientError, setClientError] = useState("");
   const [courierError, setCourierError] = useState("");
   const [customerError, setCustomerError] = useState("");
+  const [wlBranding, setWlBranding] = useState<PublicTenantBranding | null>(null);
+
+  useEffect(() => {
+    const h = typeof window !== "undefined" ? window.location.hostname : "";
+    if (!h) return;
+    fetch(`/api/public/tenant-branding?host=${encodeURIComponent(h)}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.tenant_id && d?.name) setWlBranding(d as PublicTenantBranding);
+      })
+      .catch(() => {});
+  }, []);
 
   // Add this useEffect to clear form data on page load/refresh
   useEffect(() => {
@@ -245,13 +260,13 @@ export default function LoginPage() {
 
     try {
       // Block courier-only users from signing in as organization (role separation)
-      const { data: courierOnly } = await supabase
+      const { data: courierOnly } = await supabaseService
         .from("couriers")
         .select("id")
         .eq("email", clientFormData.email)
         .single();
 
-      const { data: orgUser } = await supabase
+      const { data: orgUser } = await supabaseService
         .from("clients")
         .select("id")
         .eq("email", clientFormData.email)
@@ -263,9 +278,9 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: client, error } = await supabase
+      const { data: client, error } = await supabaseService
         .from("clients")
-        .select("id, email, company, status")
+        .select("id, email, company, status, tenant_id")
         .eq("email", clientFormData.email)
         .eq("password", clientFormData.password)
         .single();
@@ -290,6 +305,35 @@ export default function LoginPage() {
         })
       );
 
+      await fetch("/api/auth/sync-tenant", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: client.id }),
+      }).catch(() => {});
+
+      const sessRes = await fetch("/api/auth/supabase-session-from-org", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "client",
+          email: client.email,
+          password: clientFormData.password,
+        }),
+      });
+      const sessJson = await sessRes.json().catch(() => ({}));
+      if (sessRes.ok && sessJson.access_token && sessJson.refresh_token) {
+        await supabaseBrowser.auth.setSession({
+          access_token: sessJson.access_token,
+          refresh_token: sessJson.refresh_token,
+        });
+      } else {
+        toast.warning(
+          "Could not start database session. Dashboard may be empty until this is fixed (Supabase Auth + service role)."
+        );
+      }
+
       setLoginSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -309,7 +353,7 @@ export default function LoginPage() {
 
     try {
       // Block organization users from signing in as courier (role separation)
-      const { data: orgUser } = await supabase
+      const { data: orgUser } = await supabaseService
         .from("clients")
         .select("id")
         .eq("email", courierFormData.email)
@@ -321,7 +365,7 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: courier, error } = await supabase
+      const { data: courier, error } = await supabaseService
         .from("couriers")
         .select("*")
         .eq("email", courierFormData.email)
@@ -340,6 +384,33 @@ export default function LoginPage() {
 
       // Store courier data in localStorage
       localStorage.setItem("currentCourier", JSON.stringify(courier));
+      await fetch("/api/auth/sync-tenant", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courierId: courier.id }),
+      }).catch(() => {});
+
+      const cSess = await fetch("/api/auth/supabase-session-from-org", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "courier",
+          email: courier.email,
+          password: courierFormData.password,
+        }),
+      });
+      const cJson = await cSess.json().catch(() => ({}));
+      if (cSess.ok && cJson.access_token && cJson.refresh_token) {
+        await supabaseBrowser.auth.setSession({
+          access_token: cJson.access_token,
+          refresh_token: cJson.refresh_token,
+        });
+      } else {
+        toast.warning("Could not start database session for courier.");
+      }
+
       setLoginSuccess(true);
       setTimeout(() => {
         router.push("/courier");
@@ -358,7 +429,7 @@ export default function LoginPage() {
     setCustomerError(""); // Clear previous error
 
     try {
-      const { data: customer, error } = await supabase
+      const { data: customer, error } = await supabaseService
         .from("customers")
         .select("*")
         .eq("email", customerFormData.email)
@@ -376,6 +447,33 @@ export default function LoginPage() {
 
       // Store customer data in localStorage
       localStorage.setItem("currentCustomer", JSON.stringify(customer));
+      await fetch("/api/auth/sync-tenant", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: customer.id }),
+      }).catch(() => {});
+
+      const cuSess = await fetch("/api/auth/supabase-session-from-org", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "customer",
+          email: customer.email,
+          password: customerFormData.password,
+        }),
+      });
+      const cuJson = await cuSess.json().catch(() => ({}));
+      if (cuSess.ok && cuJson.access_token && cuJson.refresh_token) {
+        await supabaseBrowser.auth.setSession({
+          access_token: cuJson.access_token,
+          refresh_token: cuJson.refresh_token,
+        });
+      } else {
+        toast.warning("Could not start database session for customer portal.");
+      }
+
       setLoginSuccess(true);
       setTimeout(() => {
         router.push("/customer");
@@ -422,7 +520,8 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="min-h-screen w-full flex flex-col">
+    <WhiteLabelLayout branding={wlBranding} variant="auth">
+    <div className="min-h-screen w-full flex flex-col flex-1">
       {/* Show loading overlay when redirect is happening */}
       {loginSuccess && <LoadingOverlay />}
 
@@ -492,10 +591,12 @@ export default function LoginPage() {
                   <Warehouse className="h-6 w-6 sm:h-7 sm:w-7 relative z-10" />
                 </div>
                 <CardTitle className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-gray-800 to-gray-600 font-sans">
-                  AI-Powered Logistics Platform
+                  {wlBranding?.name ? `Login to ${wlBranding.name}` : "AI-Powered Logistics Platform"}
                 </CardTitle>
                 <CardDescription className="text-gray-500 mt-1 text-sm sm:text-base">
-                  Sign in to your account
+                  {wlBranding?.name
+                    ? `Secure sign-in for ${wlBranding.name}`
+                    : "Sign in to your account"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-6 py-3">
@@ -1582,5 +1683,6 @@ export default function LoginPage() {
         </div>
       </footer> */}
     </div>
+    </WhiteLabelLayout>
   );
 }

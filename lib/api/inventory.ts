@@ -1,6 +1,7 @@
 export async function addBin(name: string, location: string) {
     const response = await fetch('/api/bins', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, location }),
     });
@@ -12,6 +13,7 @@ export async function addBin(name: string, location: string) {
 export async function addPallet(sku_id: number, bin_id: number, quantity: number) {
     const response = await fetch('/api/pallets', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sku_id, bin_id, quantity }),
     });
@@ -28,6 +30,7 @@ export async function addQuarantineItem(
 ) {
     const response = await fetch('/api/quarantine', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sku_id, reason, quantity, location }),
     });

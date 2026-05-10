@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -195,6 +196,17 @@ export default function SettingsPage() {
               <Button className="bg-gradient-to-r from-[#3456FF] to-[#8763FF] hover:opacity-90">
                 Save Preferences
               </Button>
+              <p className="text-sm text-gray-600 pt-2">
+                For per-template toggles, Go High Level SMS flags, and test sends, open{" "}
+                <Link href="/settings/notifications" className="text-blue-600 font-medium underline">
+                  notification center
+                </Link>
+                . For plan, usage, invoices, and Stripe payment methods, open{" "}
+                <Link href="/settings/billing" className="text-blue-600 font-medium underline">
+                  billing
+                </Link>
+                .
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

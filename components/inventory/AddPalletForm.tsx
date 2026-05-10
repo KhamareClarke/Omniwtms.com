@@ -13,7 +13,7 @@ const AddPalletForm: React.FC = () => {
   useEffect(() => {
     const fetchSkus = async () => {
       try {
-        const response = await fetch("/api/skus");
+        const response = await fetch("/api/skus", { credentials: "include" });
         if (!response.ok) throw new Error("Failed to fetch SKUs");
         const data = await response.json();
         setSkus(data);
@@ -31,6 +31,7 @@ const AddPalletForm: React.FC = () => {
     try {
       const response = await fetch("/api/pallets", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sku_id: selectedSku,

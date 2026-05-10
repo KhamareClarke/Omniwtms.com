@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -33,8 +32,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { clearAllRoleStorage } from "@/lib/auth/role-guard";
+import type { PublicTenantBranding } from "@/lib/tenants/branding-types";
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  branding?: PublicTenantBranding | null;
+}
 
 interface NavItem {
   label: string;
@@ -50,39 +52,44 @@ interface NavSection {
   items: NavItem[];
 }
 
-function Logo() {
+function SidebarBrand({ branding }: { branding?: PublicTenantBranding | null }) {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load custom logo from localStorage if available
     const savedLogo = localStorage.getItem("customLogo");
-    if (savedLogo) {
-      setCustomLogo(savedLogo);
-    }
+    if (savedLogo) setCustomLogo(savedLogo);
   }, []);
 
-  if (customLogo) {
+  if (branding?.logo_url) {
     return (
       <div className="flex items-center justify-center p-2">
-        <img
-          src={customLogo}
-          alt="Company Logo"
-          className="max-h-12 w-auto object-contain"
-        />
+        {/* eslint-disable-next-line @next/next/no-img-element -- tenant CDN / storage URLs */}
+        <img src={branding.logo_url} alt="" className="max-h-12 w-auto object-contain" />
       </div>
     );
   }
 
+  if (customLogo) {
+    return (
+      <div className="flex items-center justify-center p-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={customLogo} alt="" className="max-h-12 w-auto object-contain" />
+      </div>
+    );
+  }
+
+  const title = branding?.name?.trim() || "OmniDeploy";
+
   return (
     <div className="flex items-center justify-center p-4">
-      <h2 className="text-xl font-heading font-bold tracking-wide bg-gradient-to-r from-[#3456FF] to-[#8763FF] bg-clip-text text-transparent">
-        OmniDeploy
+      <h2 className="text-xl font-heading font-bold tracking-wide bg-gradient-to-r from-[var(--wl-primary)] to-[var(--wl-secondary)] bg-clip-text text-transparent truncate max-w-full text-center">
+        {title}
       </h2>
     </div>
   );
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, branding }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -272,14 +279,16 @@ export function Sidebar({ className }: SidebarProps) {
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      <Logo />
+      <SidebarBrand branding={branding} />
 
       <div className="pt-2 pb-3 px-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center">
-            <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-[#3456FF] to-[#8763FF] flex items-center justify-center text-white font-heading font-bold text-lg shadow-md overflow-hidden">
+            <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--wl-primary)] to-[var(--wl-secondary)] flex items-center justify-center text-white font-heading font-bold text-lg shadow-md overflow-hidden">
               <div className="absolute inset-0 bg-white/10 rounded-lg"></div>
-              <span className="relative z-10">K</span>
+              <span className="relative z-10">
+                {(branding?.name?.trim()?.charAt(0) || "K").toUpperCase()}
+              </span>
             </div>
             <div className="ml-3">
               <div className="flex items-center">
@@ -305,8 +314,8 @@ export function Sidebar({ className }: SidebarProps) {
         {navSections.map((section, index) => (
           <div key={index} className="px-3 py-1">
             <h3 className="mb-2 px-3 text-xs font-heading font-bold tracking-wider flex items-center">
-              <div className="w-1 h-4 bg-gradient-to-b from-[#3456FF] to-[#8763FF] rounded-full mr-2"></div>
-              <span className="bg-gradient-to-br from-[#3456FF] to-[#8763FF] bg-clip-text text-transparent">
+              <div className="w-1 h-4 bg-gradient-to-b from-[var(--wl-primary)] to-[var(--wl-secondary)] rounded-full mr-2"></div>
+              <span className="bg-gradient-to-br from-[var(--wl-primary)] to-[var(--wl-secondary)] bg-clip-text text-transparent">
                 {section.title}
               </span>
             </h3>
@@ -318,8 +327,8 @@ export function Sidebar({ className }: SidebarProps) {
                   className={cn(
                     "text-sm group flex px-3 py-2.5 w-full justify-between items-center font-medium cursor-pointer rounded-lg transition-all duration-300 overflow-hidden relative",
                     item.active
-                      ? "bg-gradient-to-r from-[#3456FF]/10 to-[#8763FF]/10 text-[#3456FF] shadow-sm"
-                      : "text-gray-700 hover:bg-[#3456FF]/5"
+                      ? "bg-gradient-to-r from-[color-mix(in_srgb,var(--wl-primary)_10%,transparent)] to-[color-mix(in_srgb,var(--wl-secondary)_10%,transparent)] text-[var(--wl-primary)] shadow-sm"
+                      : "text-gray-700 hover:bg-[color-mix(in_srgb,var(--wl-primary)_5%,transparent)]"
                   )}
                   onClick={() => isMobile && setIsMobileOpen(false)}
                 >
@@ -328,8 +337,8 @@ export function Sidebar({ className }: SidebarProps) {
                       className={cn(
                         "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 mr-3 relative overflow-hidden",
                         item.active
-                          ? "bg-gradient-to-br from-[#3456FF] to-[#8763FF] text-white shadow-md shadow-[#3456FF]/20"
-                          : "bg-gray-100 text-gray-500 group-hover:bg-gradient-to-br group-hover:from-[#3456FF]/80 group-hover:to-[#8763FF]/80 group-hover:text-white"
+                          ? "bg-gradient-to-br from-[var(--wl-primary)] to-[var(--wl-secondary)] text-white shadow-md shadow-[color-mix(in_srgb,var(--wl-primary)_22%,transparent)]"
+                          : "bg-gray-100 text-gray-500 group-hover:bg-gradient-to-br group-hover:from-[color-mix(in_srgb,var(--wl-primary)_80%,transparent)] group-hover:to-[color-mix(in_srgb,var(--wl-secondary)_80%,transparent)] group-hover:text-white"
                       )}
                     >
                       <item.icon className="h-5 w-5 relative z-10" />
@@ -338,8 +347,8 @@ export function Sidebar({ className }: SidebarProps) {
                       className={cn(
                         "transition-colors font-medium tracking-wide",
                         item.active
-                          ? "bg-gradient-to-r from-[#3456FF] via-[#5C4EFF] to-[#8763FF] bg-clip-text text-transparent font-semibold"
-                          : "text-gray-700 group-hover:bg-gradient-to-r group-hover:from-[#3456FF] group-hover:to-[#8763FF] group-hover:bg-clip-text group-hover:text-transparent"
+                          ? "bg-gradient-to-r from-[var(--wl-primary)] via-[var(--wl-secondary)] to-[var(--wl-secondary)] bg-clip-text text-transparent font-semibold"
+                          : "text-gray-700 group-hover:bg-gradient-to-r group-hover:from-[var(--wl-primary)] group-hover:to-[var(--wl-secondary)] group-hover:bg-clip-text group-hover:text-transparent"
                       )}
                     >
                       {item.label}
@@ -361,8 +370,8 @@ export function Sidebar({ className }: SidebarProps) {
                         className={cn(
                           "text-xs px-1.5 py-0.5 rounded font-mono tracking-tighter transition-all duration-300",
                           item.active
-                            ? "bg-[#3456FF]/10 text-[#3456FF]"
-                            : "bg-gray-100 text-gray-500 group-hover:bg-[#3456FF]/10 group-hover:text-[#3456FF]"
+                            ? "bg-[color-mix(in_srgb,var(--wl-primary)_10%,transparent)] text-[var(--wl-primary)]"
+                            : "bg-gray-100 text-gray-500 group-hover:bg-[color-mix(in_srgb,var(--wl-primary)_10%,transparent)] group-hover:text-[var(--wl-primary)]"
                         )}
                       >
                         {item.shortcut}
@@ -370,7 +379,7 @@ export function Sidebar({ className }: SidebarProps) {
                     )}
 
                     {item.active && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#3456FF] animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--wl-primary)] animate-pulse"></div>
                     )}
                   </div>
                 </Link>
@@ -416,21 +425,21 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Desktop sidebar with enhanced design */}
       <div
         className={cn(
-          "hidden md:flex flex-col h-full border-r border-[#3456FF]/10 shadow-[5px_0_30px_-15px_rgba(0,0,0,0.1)]",
+          "hidden md:flex flex-col h-full border-r border-[color-mix(in_srgb,var(--wl-primary)_10%,transparent)] shadow-[5px_0_30px_-15px_rgba(0,0,0,0.1)]",
           "bg-white/90 backdrop-blur-sm relative overflow-hidden",
           className
         )}
       >
         {/* Modern dashboard-style background */}
-        <div className="absolute inset-0 bg-[radial-gradient(#3456FF10_1px,transparent_1px)] [background-size:20px_20px] opacity-25"></div>
-        <div className="absolute top-0 left-0 right-0 h-[150px] bg-gradient-to-b from-[#3456FF]/5 to-transparent -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(color-mix(in_srgb,var(--wl-primary)_12%,transparent)_1px,transparent_1px)] [background-size:20px_20px] opacity-25"></div>
+        <div className="absolute top-0 left-0 right-0 h-[150px] bg-gradient-to-b from-[color-mix(in_srgb,var(--wl-primary)_5%,transparent)] to-transparent -z-10"></div>
 
         {/* Add floating particles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="absolute h-1 w-1 rounded-full bg-[#3456FF]/30 animate-float-slow"
+              className="absolute h-1 w-1 rounded-full bg-[color-mix(in_srgb,var(--wl-primary)_30%,transparent)] animate-float-slow"
               style={{
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,

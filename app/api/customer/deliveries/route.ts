@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
+import { assertActorBelongsToTenant } from "@/lib/tenants/validate-actor";
 
 /**
  * GET /api/customer/deliveries?customer_id=xxx
  * Returns deliveries for the given customer_id. Uses service role so RLS does not block.
- * Customer portal calls this so "My Deliveries" shows assigned deliveries.
  */
 export async function GET(request: NextRequest) {
   try {
+    const t = requireTenantId(request);
+    if (t instanceof NextResponse) return t;
+
     const customerId = request.nextUrl.searchParams.get("customer_id");
     if (!customerId) {
       return NextResponse.json(
@@ -16,14 +20,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      "https://qpkaklmbiwitlroykjim.supabase.co";
-    const serviceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createAdminServiceClient();
+    const ok = await assertActorBelongsToTenant(supabase, "customer", customerId, t.tenantId);
+    if (!ok) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { data, error } = await supabase
       .from("deliveries")
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq("customer_id", customerId)
+      .eq("tenant_id", t.tenantId)
       .order("created_at", { ascending: false });
 
     if (error) {

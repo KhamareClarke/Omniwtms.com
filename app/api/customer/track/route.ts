@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://qpkaklmbiwitlroykjim.supabase.co";
-const serviceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
+import { assertActorBelongsToTenant } from "@/lib/tenants/validate-actor";
 
 function stepToLabel(step: string): string {
   const map: Record<string, string> = {
@@ -26,6 +21,9 @@ function stepToLabel(step: string): string {
  */
 export async function GET(request: NextRequest) {
   try {
+    const t = requireTenantId(request);
+    if (t instanceof NextResponse) return t;
+
     const customerId = request.nextUrl.searchParams.get("customer_id");
     const trackingNumber = request.nextUrl.searchParams.get("tracking_number")?.trim();
     if (!customerId || !trackingNumber) {
@@ -35,7 +33,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createAdminServiceClient();
+    const allowed = await assertActorBelongsToTenant(supabase, "customer", customerId, t.tenantId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { data, error } = await supabase
       .from("deliveries")
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq("customer_id", customerId)
+      .eq("tenant_id", t.tenantId)
       .eq("package_id", trackingNumber)
       .maybeSingle();
 

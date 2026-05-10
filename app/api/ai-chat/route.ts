@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenants/context';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Google AI with your API key
@@ -48,8 +49,11 @@ Remember to:
 - Maintain safety standards
 - Suggest technological integrations when relevant`;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const t = requireTenantId(req);
+    if (t instanceof NextResponse) return t;
+
     const { message } = await req.json();
 
     const model = genAI.getGenerativeModel({ 
@@ -97,6 +101,7 @@ export async function POST(req: Request) {
         model: 'gemini-pro',
         timestamp: new Date().toISOString(),
         processingTime: Date.now(),
+        tenant_id: t.tenantId,
       }
     });
   } catch (error: any) {

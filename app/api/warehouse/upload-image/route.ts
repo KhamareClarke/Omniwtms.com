@@ -1,38 +1,49 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
+import { warehouseBelongsToTenant } from "@/lib/tenants/warehouse-scope";
 
-const BUCKET_NAME = 'warehouse-assets';
+const BUCKET_NAME = "warehouse-assets";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const t = requireTenantId(request);
+  if (t instanceof NextResponse) return t;
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
     if (!supabaseUrl) {
       return NextResponse.json(
-        { error: 'Image upload not configured', details: 'Add NEXT_PUBLIC_SUPABASE_URL to .env' },
+        { error: "Image upload not configured", details: "Add NEXT_PUBLIC_SUPABASE_URL to .env" },
         { status: 503 }
       );
     }
 
-    // Use service role if set (can create bucket); otherwise use anon key (upload only if bucket exists)
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+    const warehouseId = formData.get("warehouseId") as string;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+    if (!warehouseId) {
+      return NextResponse.json({ error: "No warehouse ID provided" }, { status: 400 });
+    }
+
+    const admin = createAdminServiceClient();
+    const okWarehouse = await warehouseBelongsToTenant(admin, warehouseId, t.tenantId);
+    if (!okWarehouse) {
+      return NextResponse.json({ error: "Warehouse not found" }, { status: 404 });
+    }
+
     const supabase = serviceKey
       ? createClient(supabaseUrl, serviceKey, {
           auth: { autoRefreshToken: false, persistSession: false },
         })
       : createServerClient();
-
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const warehouseId = formData.get('warehouseId') as string;
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-    if (!warehouseId) {
-      return NextResponse.json({ error: 'No warehouse ID provided' }, { status: 400 });
-    }
 
     if (serviceKey) {
       const { data: buckets } = await supabase.storage.listBuckets();
@@ -41,31 +52,35 @@ export async function POST(request: Request) {
         const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, {
           public: true,
           fileSizeLimit: 52428800,
-          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg'],
+          allowedMimeTypes: ["image/png", "image/jpeg", "image/jpg"],
         });
         if (createError) {
           return NextResponse.json(
-            { error: 'Failed to create bucket', details: createError.message },
+            { error: "Failed to create bucket", details: createError.message },
             { status: 500 }
           );
         }
       }
     }
 
-    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileExt = file.name.split(".").pop() || "jpg";
     const fileName = `${warehouseId}-${Date.now()}.${fileExt}`;
     const filePath = `warehouse-layouts/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(filePath, file, { cacheControl: '3600', upsert: false, contentType: file.type });
+      .upload(filePath, file, { cacheControl: "3600", upsert: false, contentType: file.type });
 
     if (uploadError) {
-      const msg = uploadError.message || '';
-      const needServiceKey = msg.includes('Bucket') || msg.includes('bucket') || msg.includes('not found') || msg.includes('policy');
+      const msg = uploadError.message || "";
+      const needServiceKey =
+        msg.includes("Bucket") ||
+        msg.includes("bucket") ||
+        msg.includes("not found") ||
+        msg.includes("policy");
       return NextResponse.json(
         {
-          error: 'Failed to upload image',
+          error: "Failed to upload image",
           details: needServiceKey
             ? 'Create the "warehouse-assets" bucket in Supabase Dashboard (Storage) or add SUPABASE_SERVICE_ROLE_KEY to .env'
             : msg,
@@ -76,13 +91,12 @@ export async function POST(request: Request) {
 
     const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
     return NextResponse.json({ success: true, url: urlData.publicUrl, path: filePath });
-  } catch (error: any) {
-    console.error('Error in upload-image route:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error in upload-image route:", error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message || 'Unknown error' },
+      { error: "Internal server error", details: message },
       { status: 500 }
     );
   }
 }
-
-

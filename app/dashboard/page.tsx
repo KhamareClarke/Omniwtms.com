@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/auth/SupabaseClient";
 import {
   LineChart,
   Line,
@@ -973,22 +973,6 @@ const getWarehouseName = (warehouseId: string | undefined) => {
   return `Warehouse ${warehouseId.substring(0, 8)}`;
 };
 
-// Create a singleton instance of the Supabase client
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
-
-const getSupabaseClient = () => {
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(
-      "https://qpkaklmbiwitlroykjim.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MTM4NjIsImV4cCI6MjA1MjM4OTg2Mn0.4y_ogmlsnMMXCaISQeVo-oS6zDJnyAVEeAo6p7Ms97U"
-    );
-  }
-  return supabaseInstance;
-};
-
-// Use the singleton instance
-const supabase = getSupabaseClient();
-
 interface Delivery {
   id: string;
   created_at: string;
@@ -1373,22 +1357,27 @@ export default function DashboardPage() {
         }
 
         if (userData.type === "admin") {
-          const { data: adminCheck, error } = await supabase
-            .from("admins")
-            .select("id, email, name, status")
-            .eq("id", userData.id)
-            .single();
-
-          if (error || !adminCheck || adminCheck.status !== "active") {
-            console.error("Admin verification failed:", error);
+          const sessionRes = await fetch("/api/auth/admin/session", {
+            credentials: "include",
+          });
+          const sessionData = await sessionRes.json().catch(() => ({}));
+          if (!sessionRes.ok || !sessionData.authenticated || !sessionData.admin) {
+            console.error("Admin session verification failed", sessionData);
             localStorage.removeItem("currentUser");
-            router.push("/auth/login");
+            router.push("/auth/admin");
             return;
           }
-          setClientData(userData);
+          const synced = {
+            id: sessionData.admin.id,
+            email: sessionData.admin.email,
+            company: sessionData.admin.name || "Admin",
+            type: "admin" as const,
+          };
+          localStorage.setItem("currentUser", JSON.stringify(synced));
+          setClientData(synced);
           setIsAdmin(true);
-          fetchAdminDashboard();
           setLoading(false);
+          router.replace("/admin");
           return;
         }
 
@@ -1435,14 +1424,19 @@ export default function DashboardPage() {
   const fetchAdminDashboard = async () => {
     setAdminLoading(true);
     try {
-      const [clientsRes, couriersRes, customersRes] = await Promise.all([
-        supabase.from("clients").select("id, email, company, status, created_at").order("created_at", { ascending: false }),
-        supabase.from("couriers").select("id, email, name, status, created_at").order("created_at", { ascending: false }),
-        supabase.from("customers").select("id, email, name, status, created_at").order("created_at", { ascending: false }),
-      ]);
-      setAdminOrgs(clientsRes.data || []);
-      setAdminCouriers(couriersRes.data || []);
-      setAdminCustomers(customersRes.data || []);
+      const res = await fetch("/api/admin/directory", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("Admin directory error:", data);
+        toast.error(typeof data.error === "string" ? data.error : "Failed to load admin data");
+        setAdminOrgs([]);
+        setAdminCouriers([]);
+        setAdminCustomers([]);
+        return;
+      }
+      setAdminOrgs(Array.isArray(data.clients) ? data.clients : []);
+      setAdminCouriers(Array.isArray(data.couriers) ? data.couriers : []);
+      setAdminCustomers(Array.isArray(data.customers) ? data.customers : []);
     } catch (e) {
       console.error("Admin dashboard fetch error:", e);
       toast.error("Failed to load admin data");
@@ -1457,8 +1451,16 @@ export default function DashboardPage() {
     status: "active" | "inactive"
   ) => {
     try {
-      const { error } = await supabase.from(table).update({ status }).eq("id", id);
-      if (error) throw error;
+      const res = await fetch("/api/admin/record-status", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table, id, status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Update failed");
+      }
       toast.success(status === "inactive" ? "Suspended" : "Reactivated");
       fetchAdminDashboard();
     } catch (e: any) {
@@ -1471,7 +1473,7 @@ export default function DashboardPage() {
     setAdminAuditLoading(true);
     setAdminAuditMigrationSuggested(false);
     try {
-      const res = await fetch("/api/admin/audit-log?limit=100");
+      const res = await fetch("/api/admin/audit-log?limit=100", { credentials: "include" });
       const data = await res.json();
       if (res.ok) {
         setAdminAuditLog(Array.isArray(data?.list) ? data.list : []);
@@ -2401,9 +2403,13 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
+                onClick={async () => {
+                  await fetch("/api/auth/admin/session", {
+                    method: "DELETE",
+                    credentials: "include",
+                  }).catch(() => {});
                   clearAllRoleStorage();
-                  router.push("/auth/login");
+                  router.push("/auth/admin");
                 }}
               >
                 Log out

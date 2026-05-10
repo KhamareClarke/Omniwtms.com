@@ -56,6 +56,7 @@ export function CreateWarehouseAndFirstBin({ onSuccess }: CreateWarehouseAndFirs
 
       const binRes = await fetch("/api/warehouse/bins", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           warehouse_id: wh.id,

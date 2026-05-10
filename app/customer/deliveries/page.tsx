@@ -20,7 +20,14 @@ export default function CustomerDeliveriesPage() {
       router.push("/auth/login");
       return;
     }
-    setCustomer(JSON.parse(customerStr));
+    const c = JSON.parse(customerStr);
+    setCustomer(c);
+    fetch("/api/auth/sync-tenant", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId: c.id }),
+    }).catch(() => {});
   }, [router]);
 
   const fetchDeliveries = async (customerId: string) => {
@@ -28,7 +35,8 @@ export default function CustomerDeliveriesPage() {
     setSetupRequired(false);
     try {
       const res = await fetch(
-        `/api/customer/deliveries?customer_id=${encodeURIComponent(customerId)}`
+        `/api/customer/deliveries?customer_id=${encodeURIComponent(customerId)}`,
+        { credentials: "include" }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/auth/SupabaseClient";
 import {
   Truck,
   Wrench,
@@ -24,16 +24,6 @@ import {
   Search,
   Plus,
 } from "lucide-react";
-
-// Supabase setup
-const getSupabaseClient = () => {
-  const supabaseUrl = "https://qpkaklmbiwitlroykjim.supabase.co";
-  const supabaseKey =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MTM4NjIsImV4cCI6MjA1MjM4OTg2Mn0.4y_ogmlsnMMXCaISQeVo-oS6zDJnyAVEeAo6p7Ms97U";
-  return createClient(supabaseUrl, supabaseKey);
-};
-
-const supabase = getSupabaseClient();
 
 // Interfaces
 interface Equipment {

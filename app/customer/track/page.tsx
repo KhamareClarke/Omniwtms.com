@@ -47,7 +47,14 @@ export default function CustomerTrackPage() {
       router.push("/auth/login");
       return;
     }
-    setCustomer(JSON.parse(customerStr));
+    const c = JSON.parse(customerStr);
+    setCustomer(c);
+    fetch("/api/auth/sync-tenant", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId: c.id }),
+    }).catch(() => {});
   }, [router]);
 
   const handleTrack = async () => {
@@ -60,7 +67,8 @@ export default function CustomerTrackPage() {
     setSearched(true);
     try {
       const res = await fetch(
-        `/api/customer/track?customer_id=${encodeURIComponent(customer.id)}&tracking_number=${encodeURIComponent(tn)}`
+        `/api/customer/track?customer_id=${encodeURIComponent(customer.id)}&tracking_number=${encodeURIComponent(tn)}`,
+        { credentials: "include" }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

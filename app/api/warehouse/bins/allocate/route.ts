@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminServiceClient } from "@/lib/supabase/admin-service";
+import { requireTenantId } from "@/lib/tenants/context";
 
 /** POST - Allocate product to a bin (3D location) with capacity validation */
 export async function POST(request: NextRequest) {
+  const t = requireTenantId(request);
+  if (t instanceof NextResponse) return t;
+
   try {
-    const supabase = createClient();
+    const supabase = createAdminServiceClient();
     const body = await request.json();
     const { bin_id, product_id, quantity, volume_used, client_id } = body;
 
@@ -15,15 +19,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const qty = parseInt(String(quantity)) || 0;
+    const qty = parseInt(String(quantity), 10) || 0;
     if (qty < 1) {
       return NextResponse.json({ error: "quantity must be at least 1" }, { status: 400 });
+    }
+
+    const { data: productRow } = await supabase
+      .from("products")
+      .select("id")
+      .eq("id", product_id)
+      .eq("tenant_id", t.tenantId)
+      .maybeSingle();
+
+    if (!productRow) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     const { data: bin, error: binErr } = await supabase
       .from("warehouse_bins")
       .select("id, max_quantity, max_volume, x, y, z")
       .eq("id", bin_id)
+      .eq("tenant_id", t.tenantId)
       .single();
 
     if (binErr || !bin) {
@@ -37,10 +53,15 @@ export async function POST(request: NextRequest) {
     const { data: allocations } = await supabase
       .from("bin_allocations")
       .select("quantity, volume_used")
-      .eq("bin_id", bin_id);
+      .eq("bin_id", bin_id)
+      .eq("tenant_id", t.tenantId);
 
-    const currentQty = allocations?.reduce((s: number, a: any) => s + (a.quantity || 0), 0) ?? 0;
-    const currentVol = allocations?.reduce((s: number, a: any) => s + parseFloat(String(a.volume_used || 0)), 0) ?? 0;
+    const currentQty = allocations?.reduce((s: number, a: { quantity?: number }) => s + (a.quantity || 0), 0) ?? 0;
+    const currentVol =
+      allocations?.reduce(
+        (s: number, a: { volume_used?: number | string }) => s + parseFloat(String(a.volume_used || 0)),
+        0
+      ) ?? 0;
 
     if (maxQty > 0 && currentQty + qty > maxQty) {
       return NextResponse.json(
@@ -67,7 +88,8 @@ export async function POST(request: NextRequest) {
       .select("id, quantity, volume_used")
       .eq("bin_id", bin_id)
       .eq("product_id", product_id)
-      .single();
+      .eq("tenant_id", t.tenantId)
+      .maybeSingle();
 
     if (existing) {
       const newQty = (existing.quantity || 0) + qty;
@@ -77,6 +99,7 @@ export async function POST(request: NextRequest) {
         .from("bin_allocations")
         .update({ quantity: newQty, volume_used: newVol, updated_at: new Date().toISOString() })
         .eq("id", existing.id)
+        .eq("tenant_id", t.tenantId)
         .select()
         .single();
 
@@ -91,6 +114,7 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error: insErr } = await supabase
       .from("bin_allocations")
       .insert({
+        tenant_id: t.tenantId,
         bin_id,
         product_id,
         quantity: qty,
@@ -106,7 +130,8 @@ export async function POST(request: NextRequest) {
       action: "created",
       coordinates: { x: bin.x, y: bin.y, z: bin.z },
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Internal server error" }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

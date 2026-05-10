@@ -70,7 +70,9 @@ export function WarehouseBinsContent({ warehouseId }: WarehouseBinsContentProps)
 
   const loadBins = async () => {
     try {
-      const res = await fetch(`/api/warehouse/bins?warehouse_id=${warehouseId}`);
+      const res = await fetch(`/api/warehouse/bins?warehouse_id=${warehouseId}`, {
+        credentials: "include",
+      });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setBins(data.bins || []);
@@ -115,6 +117,7 @@ export function WarehouseBinsContent({ warehouseId }: WarehouseBinsContentProps)
     try {
       const res = await fetch("/api/warehouse/bins", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           warehouse_id: warehouseId,
@@ -152,6 +155,7 @@ export function WarehouseBinsContent({ warehouseId }: WarehouseBinsContentProps)
     try {
       const res = await fetch("/api/warehouse/bins/allocate", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bin_id: allocateForm.bin_id,
@@ -178,6 +182,7 @@ export function WarehouseBinsContent({ warehouseId }: WarehouseBinsContentProps)
     try {
       const res = await fetch("/api/warehouse/bins/move", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           from_bin_id: moveForm.from_bin_id,

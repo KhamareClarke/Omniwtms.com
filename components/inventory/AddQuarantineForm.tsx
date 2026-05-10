@@ -18,6 +18,7 @@ const AddQuarantineForm: React.FC = () => {
 
       const response = await fetch("/api/quarantine", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sku_id: defaultSkuId,

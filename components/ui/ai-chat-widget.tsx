@@ -107,6 +107,7 @@ export function AIChatWidget() {
     try {
       const response = await fetch("/api/ai-chat", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

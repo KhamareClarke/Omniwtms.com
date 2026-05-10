@@ -165,6 +165,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
       try {
         await fetch("/api/warehouse/ensure-bucket", {
           method: "POST",
+          credentials: "include",
         });
       } catch (error) {
         console.error("Failed to ensure bucket exists:", error);
@@ -285,7 +286,9 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
   const loadLayout = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/warehouse/layout?warehouse_id=${warehouseId}`);
+      const response = await fetch(`/api/warehouse/layout?warehouse_id=${warehouseId}`, {
+        credentials: "include",
+      });
       const data = await response.json();
       
       if (data.layout) {
@@ -315,7 +318,9 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
         }
         
         // Load sections with full inventory details including products
-        const sectionsResponse = await fetch(`/api/warehouse/sections?layout_id=${data.layout.id}`);
+        const sectionsResponse = await fetch(`/api/warehouse/sections?layout_id=${data.layout.id}`, {
+          credentials: "include",
+        });
         const sectionsData = await sectionsResponse.json();
         console.log("Loaded sections with inventory:", sectionsData.sections);
         setSections(sectionsData.sections || []);
@@ -366,6 +371,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
 
       const uploadResponse = await fetch("/api/warehouse/upload-image", {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 
@@ -401,6 +407,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
       
       const response = await fetch("/api/warehouse/layout", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           warehouse_id: warehouseId,
@@ -504,6 +511,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
     try {
       const response = await fetch("/api/warehouse/sections", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           layout_id: layout.id,
@@ -782,6 +790,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
       
       const response = await fetch("/api/warehouse/section-inventory", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           section_id: moveStockForm.section_id,
@@ -840,6 +849,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
 
       const res = await fetch("/api/warehouse/section-inventory/transfer", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           from_section_id: transferForm.from_section_id,
@@ -1415,6 +1425,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
                                 toast.info("Creating storage bucket...");
                                 const response = await fetch("/api/warehouse/ensure-bucket", {
                                   method: "POST",
+                                  credentials: "include",
                                 });
                                 const data = await response.json();
                                 if (response.ok) {
@@ -1833,6 +1844,7 @@ export function WarehouseFloorPlan({ warehouseId }: WarehouseFloorPlanProps) {
                                 toast.info("Creating storage bucket...");
                                 const response = await fetch("/api/warehouse/ensure-bucket", {
                                   method: "POST",
+                                  credentials: "include",
                                 });
                                 const data = await response.json();
                                 if (response.ok) {

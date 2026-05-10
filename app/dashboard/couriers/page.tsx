@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/auth/SupabaseClient";
 import {
   Table,
   TableBody,
@@ -164,18 +164,6 @@ interface Route {
   status: string;
 }
 
-// Create the Supabase client with service role key
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://qpkaklmbiwitlroykjim.supabase.co";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
-
-const supabaseClient = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
-
 const RouteOptionCard = ({
   option,
   selectedRoute,
@@ -307,7 +295,7 @@ export default function CouriersPage() {
   const fetchCouriers = async (clientId: string) => {
     try {
       setIsTableLoading(true);
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("couriers")
         .select("*")
         .eq("client_id", clientId)
@@ -325,7 +313,7 @@ export default function CouriersPage() {
 
   const fetchWarehouses = async (clientId: string) => {
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("warehouses")
         .select("*")
         .eq("client_id", clientId);
@@ -340,7 +328,7 @@ export default function CouriersPage() {
 
   const fetchCustomers = async (clientId: string) => {
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("customers")
         .select("id, name, contact_number, email")
         .eq("client_id", clientId)
@@ -354,12 +342,22 @@ export default function CouriersPage() {
     }
   };
 
-  const sendEmail = async (to: string | string[], subject: string, html: string) => {
+  const sendEmail = async (
+    to: string | string[],
+    subject: string,
+    html: string,
+    clientId?: string
+  ) => {
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject, html }),
+        body: JSON.stringify({
+          to,
+          subject,
+          html,
+          ...(clientId ? { client_id: clientId } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -373,7 +371,7 @@ export default function CouriersPage() {
   const fetchDeliveries = async (clientId: string) => {
     try {
       setIsDeliveriesLoading(true);
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("deliveries")
         .select(
           `
@@ -406,7 +404,7 @@ export default function CouriersPage() {
 
   const fetchWarehouseProducts = async (warehouseId: string) => {
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("warehouse_inventory")
         .select(
           `
@@ -495,7 +493,7 @@ export default function CouriersPage() {
       }
 
       // Check if courier email already exists
-      const { data: existingCourier, error: checkError } = await supabaseClient
+      const { data: existingCourier, error: checkError } = await supabase
         .from("couriers")
         .select("id")
         .eq("email", formData.email)
@@ -507,7 +505,7 @@ export default function CouriersPage() {
         return;
       }
 
-      const { data: courierData, error: courierError } = await supabaseClient
+      const { data: courierData, error: courierError } = await supabase
         .from("couriers")
         .insert({
           name: formData.name,
@@ -545,15 +543,16 @@ export default function CouriersPage() {
       resetForm();
       fetchCouriers(userData.id);
 
-      // Email: notify new courier
+      // Email: notify new courier (tenant branding via client_id)
       sendEmail(
         formData.email,
-        "Welcome – OmniWTMS Courier account",
+        "Welcome – your courier account",
         `<p>Hello ${formData.name},</p>
         <p>Your courier account has been created.</p>
         <p><strong>Email:</strong> ${formData.email}</p>
         <p><strong>Password:</strong> ${formData.password}</p>
-        <p>Sign in at the courier portal to view and complete deliveries.</p>`
+        <p>Sign in at the courier portal to view and complete deliveries.</p>`,
+        userData.id
       );
     } catch (error: any) {
       console.error("Error adding courier:", error);
@@ -668,7 +667,7 @@ export default function CouriersPage() {
       };
 
       // Create the delivery record
-      const { data: deliveryData, error: deliveryError } = await supabaseClient
+      const { data: deliveryData, error: deliveryError } = await supabase
         .from("deliveries")
         .insert([deliveryPayload])
         .select(
@@ -709,7 +708,7 @@ export default function CouriersPage() {
           longitude: stop.longitude || null,
           estimated_time: null,
         }));
-        const { error: stopsInsertError } = await supabaseClient
+        const { error: stopsInsertError } = await supabase
           .from("delivery_stops")
           .insert(stopsToInsert);
         if (stopsInsertError) {
@@ -751,14 +750,14 @@ export default function CouriersPage() {
       ];
 
       // Create the delivery stops
-      const { data: stopsData, error: stopsError } = await supabaseClient
+      const { data: stopsData, error: stopsError } = await supabase
         .from("delivery_stops")
         .insert(stops)
         .select();
 
       if (stopsError) {
         console.error("Delivery Stops Creation Error:", stopsError);
-        await supabaseClient
+        await supabase
           .from("deliveries")
           .delete()
           .eq("id", deliveryData.id);
@@ -797,7 +796,8 @@ export default function CouriersPage() {
           <p><strong>Delivery to:</strong> ${deliveryAddress}</p>
           <p><strong>Pickup time:</strong> ${deliveryFormData.pickup_time}</p>
           <p><strong>Priority:</strong> ${deliveryFormData.priority}</p>
-          <p>Log in to your courier dashboard to view details and start delivery.</p>`
+          <p>Log in to your courier dashboard to view details and start delivery.</p>`,
+          userData.id
         );
       }
       // Customer email only when org updates status (Customer Activity), not on assignment
@@ -818,7 +818,7 @@ export default function CouriersPage() {
       } catch (_) {}
 
       // Update courier's delivery count
-      const { error: courierUpdateError } = await supabaseClient
+      const { error: courierUpdateError } = await supabase
         .from("couriers")
         .update({
           deliveries_completed: selectedCourierData.deliveries_completed + 1,
@@ -1205,17 +1205,17 @@ export default function CouriersPage() {
       const fileExt = file.name.split(".").pop();
       const fileName = `${deliveryId}-pod.${fileExt}`;
       const { data: uploadData, error: uploadError } =
-        await supabaseClient.storage.from("pod_files").upload(fileName, file);
+        await supabase.storage.from("pod_files").upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
       // Get public URL
       const {
         data: { publicUrl },
-      } = supabaseClient.storage.from("pod_files").getPublicUrl(fileName);
+      } = supabase.storage.from("pod_files").getPublicUrl(fileName);
 
       // Update delivery record with POD file URL
-      const { error: updateError } = await supabaseClient
+      const { error: updateError } = await supabase
         .from("deliveries")
         .update({
           pod_file: publicUrl,
@@ -1293,7 +1293,7 @@ export default function CouriersPage() {
       console.log("Checking for associated deliveries...");
 
       // First check if the courier has any associated deliveries
-      const { data: deliveries, error: deliveriesError } = await supabaseClient
+      const { data: deliveries, error: deliveriesError } = await supabase
         .from("deliveries")
         .select("id, status")
         .eq("courier_id", courierId);
@@ -1328,7 +1328,7 @@ export default function CouriersPage() {
 
         // If user confirms force delete, first delete the associated deliveries
         console.log("Deleting associated deliveries...");
-        const { error: deliveriesDeleteError } = await supabaseClient
+        const { error: deliveriesDeleteError } = await supabase
           .from("deliveries")
           .delete()
           .eq("courier_id", courierId);
@@ -1344,7 +1344,7 @@ export default function CouriersPage() {
 
       console.log("Proceeding with courier deletion...");
       // Delete the courier
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from("couriers")
         .delete()
         .eq("id", courierId);
@@ -1394,7 +1394,7 @@ export default function CouriersPage() {
         updateData.password = formData.password;
       }
 
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from("couriers")
         .update(updateData)
         .eq("id", editingCourier.id);

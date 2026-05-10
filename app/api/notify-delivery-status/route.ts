@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendEmail, brandedEmailHtml } from "@/lib/email";
+import { sendEmail, brandedEmailHtml, loadMailBranding } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email/send";
+import { isEmailOutgoingConfigured } from "@/lib/email/config";
+import { maybeSendTenantSms } from "@/lib/sms/dispatch";
+import { DEFAULT_TENANT_ID } from "@/lib/tenants/constants";
 import { emitStatusUpdated } from "@/lib/events";
 import "@/services/listeners/delivery";
 
@@ -37,9 +41,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const emailConfigured =
-      (process.env.EMAIL_USER != null && process.env.EMAIL_PASS != null) ||
-      (process.env.RESEND_API_KEY != null && process.env.RESEND_API_KEY.trim() !== "");
     const adminEmail = (process.env.ADMIN_EMAIL || "clarkekhamare@gmail.com").trim();
     const statusLabel =
       newStatus === "completed"
@@ -62,8 +63,9 @@ export async function POST(request: NextRequest) {
         shipping_label,
         client_id,
         customer_id,
+        tenant_id,
         clients!client_id ( email ),
-        customers!customer_id ( email, name )
+        customers!customer_id ( email, name, contact_number )
       `
       )
       .eq("id", deliveryId)
@@ -76,6 +78,9 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    const deliveryTid = (delivery as { tenant_id?: string | null }).tenant_id ?? null;
+    const emailConfigured = await isEmailOutgoingConfigured(deliveryTid);
 
     const packageId = delivery.package_id ?? deliveryId;
     const previousStatus = (delivery as any).status;
@@ -144,6 +149,15 @@ export async function POST(request: NextRequest) {
       ? `<p><strong>Proof of delivery:</strong> <a href="${podFile}" target="_blank" rel="noopener">View POD</a></p>`
       : "";
 
+    const customerRow = delivery.customers as {
+      email?: string;
+      name?: string;
+      contact_number?: string | null;
+    } | null;
+
+    const mailBranding = await loadMailBranding(deliveryTid);
+    const fromName = mailBranding?.companyName;
+
     const baseContent = `
       <p><strong>Delivery status update</strong></p>
       <p><strong>Package ID:</strong> ${packageId}</p>
@@ -164,7 +178,13 @@ export async function POST(request: NextRequest) {
           await sendEmail({
             to: orgEmail,
             subject: `Delivery ${statusLabel}: ${packageId}`,
-            html: brandedEmailHtml(`<p>Delivery status has been updated.</p>${baseContent}`, `Delivery ${statusLabel}`),
+            html: brandedEmailHtml(
+              `<p>Delivery status has been updated.</p>${baseContent}`,
+              `Delivery ${statusLabel}`,
+              mailBranding
+            ),
+            fromDisplayName: fromName,
+            tenantId: deliveryTid,
           });
           emailed = true;
         } catch (e) {
@@ -183,8 +203,10 @@ export async function POST(request: NextRequest) {
           `;
           await sendEmail({
             to: orgEmail,
-            subject: `[OmniWTMS] Courier activity – ${statusLabel}: ${packageId}`,
-            html: brandedEmailHtml(courierActionContent, "Courier Activity"),
+            subject: `[${fromName ?? "OmniWTMS"}] Courier activity – ${statusLabel}: ${packageId}`,
+            html: brandedEmailHtml(courierActionContent, "Courier Activity", mailBranding),
+            fromDisplayName: fromName,
+            tenantId: deliveryTid,
           });
           emailed = true;
         } catch (e) {
@@ -192,22 +214,66 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const customerRow = delivery.customers as { email?: string; name?: string } | null;
       const customerEmail = customerRow?.email?.trim?.() || "";
-      if (customerEmail && triggeredBy === "organization") {
-        try {
-          const name = customerRow?.name ? ` ${customerRow.name}` : "";
-          const customerContent = `<p>Hello${name},</p><p>Your parcel delivery status has been updated.</p>${baseContent}
+      if (triggeredBy === "organization" && customerRow) {
+        const tid = deliveryTid;
+        const cname = customerRow?.name?.trim() || "Customer";
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+        if (customerEmail) {
+          try {
+            if (newStatus === "completed") {
+              await sendTemplateEmail({
+                to: customerEmail,
+                templateId: "delivery-complete",
+                variables: {
+                  customerName: cname,
+                  packageId,
+                  extraNote: `Tracking: ${packageId}. View POD in your tracking page if available.`,
+                  trackingUrl: `${baseUrl}/track/${encodeURIComponent(packageId)}`,
+                },
+                tenantId: tid,
+              });
+              emailed = true;
+            } else if (newStatus === "failed") {
+              await sendTemplateEmail({
+                to: customerEmail,
+                templateId: "delivery-failed",
+                variables: {
+                  customerName: cname,
+                  packageId,
+                  failureReason: "Please check tracking or contact support.",
+                },
+                tenantId: tid,
+              });
+              emailed = true;
+            } else if (newStatus === "in_progress") {
+              await sendTemplateEmail({
+                to: customerEmail,
+                templateId: "order-picked",
+                variables: {
+                  customerName: cname,
+                  orderId: packageId,
+                },
+                tenantId: tid,
+              });
+              emailed = true;
+            } else {
+              const name = customerRow?.name ? ` ${customerRow.name}` : "";
+              const customerContent = `<p>Hello${name},</p><p>Your parcel delivery status has been updated.</p>${baseContent}
 <p><strong>Your tracking number:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">${packageId}</code></p>
 <p>Track your delivery anytime at <strong>Track</strong> (no login required) or in the customer dashboard.</p>`;
-          await sendEmail({
-            to: customerEmail,
-            subject: newStatus === "completed" ? `Your delivery has been delivered – ${packageId}` : `Your delivery is ${statusLabel.toLowerCase()} – ${packageId}`,
-            html: brandedEmailHtml(customerContent, "Delivery Update"),
-          });
-          emailed = true;
-        } catch (e) {
-          console.error("Notify customer email failed:", e);
+              await sendEmail({
+                to: customerEmail,
+                subject: `Your delivery is ${statusLabel.toLowerCase()} – ${packageId}`,
+                html: brandedEmailHtml(customerContent, "Delivery Update", mailBranding),
+                fromDisplayName: fromName,
+                tenantId: deliveryTid,
+              });
+              emailed = true;
+            }
+          } catch (e) {
+            console.error("Notify customer email failed:", e);
+          }
         }
       }
 
@@ -219,11 +285,14 @@ export async function POST(request: NextRequest) {
               : "Organization has been notified of courier activity. Customer is notified only when organization updates status.";
           await sendEmail({
             to: adminEmail,
-            subject: `[OmniWTMS] Delivery ${statusLabel}: ${packageId}`,
+            subject: `[${fromName ?? "OmniWTMS"}] Delivery ${statusLabel}: ${packageId}`,
             html: brandedEmailHtml(
               `${baseContent}<p><strong>Triggered by:</strong> ${triggeredBy === "organization" ? "Organization" : "Courier"}</p><p>${adminNote}</p>`,
-              "Admin: Delivery Update"
+              "Admin: Delivery Update",
+              mailBranding
             ),
+            fromDisplayName: fromName,
+            tenantId: deliveryTid,
           });
           emailed = true;
         } catch (e) {
@@ -238,6 +307,29 @@ export async function POST(request: NextRequest) {
             metadata: auditMeta({ to: adminEmail, subject: `Delivery ${statusLabel}: ${packageId}` }),
           });
         } catch (_) {}
+      }
+    }
+
+    if (triggeredBy === "organization" && customerRow) {
+      const phone = String(customerRow.contact_number || "").trim();
+      const smsTid =
+        ((delivery as { tenant_id?: string | null }).tenant_id ?? null) || DEFAULT_TENANT_ID;
+      if (phone) {
+        try {
+          let smsBody = "";
+          if (newStatus === "completed") {
+            smsBody = `Your delivery ${packageId} is complete. Thank you.`;
+          } else if (newStatus === "failed") {
+            smsBody = `Delivery ${packageId}: we could not complete it. Check your email for details.`;
+          } else if (newStatus === "in_progress") {
+            smsBody = `Order ${packageId} has been picked and is being prepared for dispatch.`;
+          } else {
+            smsBody = `Delivery ${packageId} update: ${statusLabel}.`;
+          }
+          await maybeSendTenantSms({ tenantId: smsTid, to: phone, body: smsBody });
+        } catch (e) {
+          console.error("Notify customer SMS failed:", e);
+        }
       }
     }
 

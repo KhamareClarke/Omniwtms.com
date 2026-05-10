@@ -43,8 +43,6 @@ import {
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-// @ts-ignore
-import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import dynamic from "next/dynamic";
 import html2canvas from "html2canvas";
 
@@ -109,11 +107,6 @@ const steps = [
   "Quality Check",
   "Warehouse Putaway",
 ];
-
-// Set the workerSrc for pdfjsLib in browser environments
-if (typeof window !== "undefined" && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
 
 const WarehouseLabel = dynamic(() => import("./WarehouseLabel"), {
   ssr: false,
@@ -596,6 +589,10 @@ export function WarehouseOperations({ warehouseId }: WarehouseOperationsProps) {
       const reader = new FileReader();
       reader.onload = async (evt) => {
         const typedarray = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const pdfjsLib = await import("pdfjs-dist");
+        if (pdfjsLib.GlobalWorkerOptions) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        }
         const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
         let text = "";
         for (let i = 1; i <= pdf.numPages; i++) {

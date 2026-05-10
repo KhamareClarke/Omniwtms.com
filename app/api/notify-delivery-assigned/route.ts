@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendEmail, brandedEmailHtml } from "@/lib/email";
+import { sendEmail, brandedEmailHtml, loadMailBranding } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email/send";
+import { maybeSendTenantSms } from "@/lib/sms/dispatch";
+import { isEmailOutgoingConfigured } from "@/lib/email/config";
 import { emitDeliveryAssigned } from "@/lib/events";
 
 const supabaseUrl =
@@ -16,11 +19,7 @@ const serviceRoleKey =
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return NextResponse.json({ ok: false, skipped: "Email not configured" }, { status: 200 });
-    }
     const adminEmail = (process.env.ADMIN_EMAIL || "clarkekhamare@gmail.com").trim();
-    if (!adminEmail) return NextResponse.json({ ok: true });
 
     const body = await request.json();
     const { delivery_id: deliveryId, package_id: packageId, pickup, delivery_to, courier_name } = body;
@@ -45,22 +44,69 @@ export async function POST(request: NextRequest) {
     if (clientIp) metadata.ip = clientIp;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    try {
-      await sendEmail({
-        to: adminEmail,
-        subject: `[OmniWTMS] New delivery assigned: ${packageId}`,
-        html: brandedEmailHtml(
-          `<p><strong>New delivery assigned</strong> (admin notification)</p>
+    const { data: delRow } = await supabase
+      .from("deliveries")
+      .select("tenant_id, courier_id")
+      .eq("id", deliveryId)
+      .maybeSingle();
+    const tenantId = (delRow as { tenant_id?: string | null } | null)?.tenant_id ?? null;
+    const emailOk = await isEmailOutgoingConfigured(tenantId);
+    const courierId = (delRow as { courier_id?: string | null } | null)?.courier_id ?? null;
+    type CourierRow = { name?: string | null; email?: string | null; phone?: string | null };
+    let courier: CourierRow | null = null;
+    if (courierId) {
+      const { data: c } = await supabase
+        .from("couriers")
+        .select("name, email, phone")
+        .eq("id", courierId)
+        .maybeSingle();
+      courier = (c as CourierRow | null) ?? null;
+    }
+    const mailBranding = await loadMailBranding(tenantId);
+    const fromName = mailBranding?.companyName;
+
+    if (emailOk && adminEmail) {
+      try {
+        await sendEmail({
+          to: adminEmail,
+          subject: `[${fromName ?? "OmniWTMS"}] New delivery assigned: ${packageId}`,
+          html: brandedEmailHtml(
+            `<p><strong>New delivery assigned</strong> (admin notification)</p>
 <p><strong>Package ID:</strong> ${packageId}</p>
 <p><strong>Pickup:</strong> ${pickup || "—"}</p>
 <p><strong>Delivery to:</strong> ${delivery_to || "—"}</p>
 <p><strong>Courier:</strong> ${courier_name || "—"}</p>
 <p>Check the dashboard for full details.</p>`,
-          "New Delivery Assigned"
-        ),
+            "New Delivery Assigned",
+            mailBranding
+          ),
+          fromDisplayName: fromName,
+          tenantId,
+        });
+      } catch (e) {
+        console.error("Admin assign email failed:", e);
+      }
+    }
+
+    if (emailOk && courier?.email?.trim()) {
+      await sendTemplateEmail({
+        to: courier.email.trim(),
+        templateId: "delivery-assigned",
+        variables: {
+          courierName: courier.name || courier_name || "Courier",
+          packageId,
+          pickupAddress: String(pickup || "—"),
+          dropoffAddress: String(delivery_to || "—"),
+        },
+        tenantId,
       });
-    } catch (e) {
-      console.error("Admin assign email failed:", e);
+    }
+    if (tenantId && courier?.phone?.trim()) {
+      await maybeSendTenantSms({
+        tenantId: tenantId as string,
+        to: courier.phone.trim(),
+        body: `New delivery ${packageId}. Pickup: ${String(pickup || "")}. Check your courier app.`,
+      });
     }
     try {
       await supabase.from("delivery_audit_log").insert({

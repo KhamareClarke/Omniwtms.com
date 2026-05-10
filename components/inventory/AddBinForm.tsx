@@ -13,6 +13,7 @@ const AddBinForm: React.FC = () => {
     try {
       const response = await fetch("/api/bins", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, location }),
       });
