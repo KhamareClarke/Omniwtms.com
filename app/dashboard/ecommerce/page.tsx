@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -709,9 +710,17 @@ export default function EcommerceDashboard() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[#3456FF] to-[#8763FF] bg-clip-text text-transparent">
-          Ecommerce Dashboard
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[#3456FF] to-[#8763FF] bg-clip-text text-transparent">
+            Ecommerce Dashboard
+          </h1>
+          <Link
+            href="/dashboard/ecommerce/integrations"
+            className="text-sm text-[#3456FF] hover:underline mt-1 inline-block"
+          >
+            Store integrations and sync logs
+          </Link>
+        </div>
         <div className="flex items-center">
           <Badge variant="outline" className="bg-blue-50 text-blue-700 mr-2">
             Live Data
