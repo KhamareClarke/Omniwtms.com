@@ -47,7 +47,7 @@ export async function GET(_request: NextRequest, context: Ctx) {
     line_items: items,
   });
 
-  return new NextResponse(pdf, {
+  return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="invoice-${invoiceId}.pdf"`,

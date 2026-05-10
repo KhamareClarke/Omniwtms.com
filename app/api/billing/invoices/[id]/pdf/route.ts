@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, context: Ctx) {
         ],
   });
 
-  return new NextResponse(pdf, {
+  return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="invoice-${id}.pdf"`,
