@@ -1,7 +1,8 @@
+import { logNotification } from "@/lib/notifications/log";
 export { sendTemplateEmail, type TemplateId } from "@/lib/email/send";
 export { sendSMS } from "@/lib/sms/send";
 export { maybeSendTenantSms } from "@/lib/sms/dispatch";
-export { logNotification } from "@/lib/notifications/log";
+export { logNotification };
 export {
   getNotificationPreferences,
   upsertNotificationPreferences,
