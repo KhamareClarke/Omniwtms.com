@@ -86,13 +86,15 @@ export async function getTenantConfig(tenantId: string): Promise<TenantBrandingC
   };
 }
 
-/** Merge DB values with safe defaults for CSS / email. */
-export function withDefaultBranding(config: TenantBrandingConfig | null): Required<
-  Pick<TenantBrandingConfig, "name" | "primary_color" | "secondary_color" | "text_color">
-> & {
+/** Merge DB values with safe defaults for CSS / email (colors are always non-null strings). */
+export function withDefaultBranding(config: TenantBrandingConfig | null): {
   id: string;
-  logo_url: string | null;
+  name: string;
   domain: string | null;
+  logo_url: string | null;
+  primary_color: string;
+  secondary_color: string;
+  text_color: string;
   admin_email: string | null;
 } {
   if (!config) {
