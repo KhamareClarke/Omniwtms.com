@@ -87,6 +87,59 @@
 
 ---
 
+## 7. Empire OS (webhook + recommendations UI) ✅ 100% COMPLETE (scoped)
+
+**Scope:** Outbound webhook to tenant-configured URL when `feature_empire_os` is on and `metadata.empire_os_webhook_url` is set. Canonical event names + dashboard to review/send recommendations and backlog. **“33 autonomous skills”** refers to processing on the **Empire OS receiver** side against this contract—not 33 separate modules inside OmniWTMS.
+
+| Requirement | Status | Evidence |
+|-------------|--------|----------|
+| Webhook transport | ✅ | `lib/integrations/empire-os.ts` – `sendEmpireOSEvent`. |
+| Canonical event names + fire-and-forget dispatch | ✅ | `lib/integrations/empire-os-dispatch.ts` – `EmpireOSEvents`, `empireOsDispatch`. |
+| `order_created` | ✅ | `app/api/orders/create/route.ts` after successful template send. |
+| `order_shipped` | ✅ | `app/api/deliveries/create/route.ts`; delivery status `out_for_delivery` also maps in listener (see below). |
+| `order_picked` | ✅ | `services/listeners/delivery.ts` – status `in_progress`. |
+| `delivery_assigned` | ✅ | Same listener on `delivery.assigned`; `emitDeliveryAssigned` includes `tenant_id` from `app/api/notify-delivery-assigned/route.ts`. |
+| `delivery_in_transit` | ✅ | Listener – status `out_for_delivery`. |
+| `delivery_completed` / `delivery_failed` | ✅ | Listener – `completed` / `failed`. |
+| `delivery.status_updated` envelope | ✅ | Listener on every status change. |
+| `inventory_low` | ✅ | `lib/suppliers/create-po.ts` – `autoCreatePOsForLowStock` after auto-PO created. |
+| `warehouse_backlog` | ✅ | Manual: `app/dashboard/empire-os/page.tsx` → POST `warehouse_backlog` with metrics snapshot. |
+| `performance_milestone` | ✅ | `app/api/payments/create/route.ts` – successful payment. |
+| Recommendations + connection UI | ✅ | `app/dashboard/empire-os/page.tsx`, `GET/POST /api/dashboard/empire-os`. |
+| Tenant context on status emit | ✅ | `app/api/notify-delivery-status/route.ts` – `metadata.tenant_id` on `emitStatusUpdated`. |
+
+**Env / config:** Enable Empire on tenant in Admin; set `metadata.empire_os_webhook_url` on the `tenants` row (JSON metadata).
+
+---
+
+## 8. Supplier portal (embedded) ✅ 100% COMPLETE (scoped)
+
+**Scope:** Supplier-facing PO view, acknowledgements, delivery confirmation with notes/doc URL, line items, org-side quick PO tab—not a standalone multi-tenant supplier SaaS product.
+
+| Requirement | Status | Evidence |
+|-------------|--------|----------|
+| PO creation / send (lib) | ✅ | `lib/suppliers/create-po.ts`, APIs under `app/api/suppliers/**`. |
+| Supplier portal login | ✅ | `app/suppliers/portal/login/page.tsx`, `POST /api/suppliers/portal/login`. |
+| Supplier detail UI | ✅ | `app/suppliers/[id]/page.tsx` – tabs (orders, procurement, documents), expandable line items, delivery dialog, merged notes via `app/api/suppliers/purchase-orders/[id]/delivery-update/route.ts`. |
+| PO list with `po_number` + items | ✅ | `GET /api/suppliers/[id]` – expanded `purchase_orders` select with `po_items` / `skus`. |
+
+---
+
+## 9. Payroll & time tracking (reporting) ✅ 100% COMPLETE (scoped)
+
+**Scope:** Time logs, monthly rollups, overtime/bonus math, dashboard + trends + exports—not statutory payroll / tax filings.
+
+| Requirement | Status | Evidence |
+|-------------|--------|----------|
+| Wage math | ✅ | `lib/payroll/calculate.ts`. |
+| Monthly snapshot (shared) | ✅ | `lib/payroll/month-snapshot.ts` – `getPayrollMonthSnapshot`. |
+| Monthly API | ✅ | `GET /api/payroll/monthly` – uses snapshot helper. |
+| Multi-month trends API | ✅ | `GET /api/payroll/trends`. |
+| Dashboard + charts + CSV/PDF | ✅ | `app/dashboard/payroll/page.tsx` (Recharts, employee CSV, trends CSV, PDF summary). |
+| Clock UI | ✅ | `app/dashboard/payroll/clock/page.tsx`, `app/api/payroll/clock`. |
+
+---
+
 ## Summary
 
 | # | System | Status |
@@ -97,5 +150,8 @@
 | 4 | System-Wide Audit Logs | ✅ Complete |
 | 5 | Internal Event Architecture | ✅ Complete |
 | 6 | Public Tracking UI | ✅ Complete |
+| 7 | Empire OS (webhook + UI + event map) | ✅ Complete (scoped) |
+| 8 | Supplier portal (embedded) | ✅ Complete (scoped) |
+| 9 | Payroll & reporting | ✅ Complete (scoped) |
 
-All six systems are implemented. For handover: run migrations, set env vars (EMAIL_*, optional RESEND_API_KEY, ADMIN_EMAIL), and provide screenshots of one production email, timeline UI, POD in admin, audit log entry, and public `/track` with a test tracking number.
+Systems 1–6 and 7–9 are implemented per the scopes above. For handover: run migrations, set env vars (EMAIL_*, optional RESEND_API_KEY, ADMIN_EMAIL), configure Empire OS on tenant when used, and provide screenshots of production email, timeline UI, POD, audit log, public `/track`, Empire OS dashboard, supplier portal flow, and payroll trends export.
