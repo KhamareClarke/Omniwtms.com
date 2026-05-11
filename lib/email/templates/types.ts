@@ -32,10 +32,18 @@ export const TEMPLATE_IDS = [
   // Support (2)
   "support-ticket-received",
   "support-ticket-resolved",
-  // Extra system (3) → 28 total
+  // Extra system (3) + returns (5) + cold chain (1)
   "payment-reminder",
   "trial-ending-soon",
   "api-key-rotated",
+  // Returns / RMA (5)
+  "return-created",
+  "return-approved",
+  "return-rejected",
+  "return-received",
+  "refund-processed",
+  // Cold chain (1)
+  "temperature-deviation",
 ] as const;
 
 export type TemplateId = (typeof TEMPLATE_IDS)[number];

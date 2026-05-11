@@ -47,8 +47,10 @@ export async function GET(request: NextRequest) {
           status: o.status || "pending",
           created_at: o.created_at,
           updated_at: o.updated_at,
+          _source: "order",
           items: (o.order_items || []).map((i: any) => ({
             id: i.id,
+            sku_id: i.sku_id,
             quantity: i.quantity,
             sku_name: i.skus?.name,
             sku_code: i.skus?.code,
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest) {
           status: "active",
           created_at: row.created_at,
           updated_at: row.created_at,
+          _source: "simple",
           items: [
             {
               quantity: row.quantity,

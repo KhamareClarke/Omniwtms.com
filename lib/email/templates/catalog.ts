@@ -168,4 +168,40 @@ export const EMAIL_TEMPLATE_CATALOG: Record<TemplateId, Builder> = {
     `<p style="margin:0 0 12px;">Team {{orgName}},</p>
 <p style="margin:0;">An API key ending in <strong>{{keyLast4}}</strong> was rotated. Update integrations if needed.</p>`
   ),
+  "return-created": S(
+    "Return submitted — {{rmaNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0 0 12px;">We received your return request <strong>{{rmaNumber}}</strong>.</p>
+<p style="margin:0 0 12px;"><strong>Reason:</strong> {{reason}}</p>
+<p style="margin:0;">Track status: <a href="{{returnStatusUrl}}" style="color:#3456FF;">{{returnStatusUrl}}</a></p>`
+  ),
+  "return-approved": S(
+    "Return approved — {{rmaNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0 0 12px;">Your return <strong>{{rmaNumber}}</strong> is approved.</p>
+<p style="margin:0 0 12px;">Download your return label: <a href="{{labelUrl}}" style="color:#3456FF;">{{labelUrl}}</a></p>
+<p style="margin:0;">Print and attach it to the outer carton.</p>`
+  ),
+  "return-rejected": S(
+    "Return not approved — {{rmaNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0 0 12px;">We could not approve return <strong>{{rmaNumber}}</strong>.</p>
+<p style="margin:0;"><strong>Reason:</strong> {{rejectionReason}}</p>`
+  ),
+  "return-received": S(
+    "We received your return — {{rmaNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0;">Your package for <strong>{{rmaNumber}}</strong> arrived at our facility. Inspection will follow.</p>`
+  ),
+  "refund-processed": S(
+    "Refund processed — {{rmaNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0;">Refund for <strong>{{rmaNumber}}</strong> is processed. Reference: <strong>{{refundReference}}</strong>.</p>`
+  ),
+  "temperature-deviation": S(
+    "Temperature alert — {{packageId}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0 0 12px;">Cold chain alert for <strong>{{packageId}}</strong>: reading <strong>{{reading}}°C</strong> (allowed {{minTemp}}°C – {{maxTemp}}°C).</p>
+<p style="margin:0;">Device: {{deviceId}} · {{occurredAt}}</p>`
+  ),
 };

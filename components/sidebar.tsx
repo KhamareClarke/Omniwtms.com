@@ -24,6 +24,7 @@ import {
   Store,
   Tag,
   Receipt,
+  Activity,
   Car,
   BarChart3,
   Layers,
@@ -266,6 +267,18 @@ export function Sidebar({ className, branding }: SidebarProps) {
           icon: FileBarChart,
           href: "/dashboard/reports/custom-report",
           active: pathname === "/dashboard/reports/custom-report",
+        },
+        {
+          label: "Returns",
+          icon: Receipt,
+          href: "/dashboard/returns",
+          active: pathname === "/dashboard/returns",
+        },
+        {
+          label: "Cold chain",
+          icon: Activity,
+          href: "/dashboard/cold-chain",
+          active: pathname === "/dashboard/cold-chain",
         },
         {
           label: "Ecommerce",
