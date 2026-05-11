@@ -18,6 +18,9 @@ export default function App() {
   const [guestId, setGuestId] = useState("");
   const [signedIn, setSignedIn] = useState(false);
   const [rating, setRating] = useState(0);
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackError, setTrackError] = useState<string | null>(null);
+  const [trackData, setTrackData] = useState<any>(null);
 
   const styles = useMemo(
     () => ({
@@ -47,6 +50,30 @@ export default function App() {
   const openTrackWeb = () => {
     const id = guestId.trim() || "DEMO-PKG";
     void Linking.openURL(`https://omniwtms.com/track/${encodeURIComponent(id)}`);
+  };
+
+  const apiBaseUrl = (process.env as any)?.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3020";
+
+  const fetchTracking = async () => {
+    const id = guestId.trim();
+    if (!id) return;
+    setTrackLoading(true);
+    setTrackError(null);
+    setTrackData(null);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/public/track?tracking_number=${encodeURIComponent(id)}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setTrackError(json?.error || "Tracking lookup failed");
+        setTrackLoading(false);
+        return;
+      }
+      setTrackData(json);
+      setTrackLoading(false);
+    } catch (e: any) {
+      setTrackError(e?.message || "Network error");
+      setTrackLoading(false);
+    }
   };
 
   return (
@@ -82,16 +109,36 @@ export default function App() {
                 marginBottom: 8,
               }}
             />
+            <Pressable
+              onPress={() => void fetchTracking()}
+              style={{ backgroundColor: "#111827", padding: 12, borderRadius: 10, marginBottom: 8, opacity: trackLoading ? 0.7 : 1 }}
+            >
+              <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>
+                {trackLoading ? "Looking up…" : "Lookup status (API)"}
+              </Text>
+            </Pressable>
             <Pressable onPress={openTrackWeb} style={{ backgroundColor: "#3456FF", padding: 12, borderRadius: 10, marginBottom: 8 }}>
               <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>Open tracking page</Text>
             </Pressable>
             <View style={{ padding: 10, backgroundColor: dark ? "#0f172a" : "#f1f5f9", borderRadius: 8 }}>
-              <Text style={[styles.text, { fontWeight: "600" }]}>Live status (sample)</Text>
-              <Text style={[styles.sub, { marginTop: 6 }]}>Courier: Alex · Vehicle: Van 12</Text>
-              <Text style={[styles.sub]}>ETA: ~18 min · Last ping: 2 min ago</Text>
-              <Pressable onPress={() => void Linking.openURL("tel:+440000000000")} style={{ marginTop: 10 }}>
-                <Text style={{ color: "#60a5fa", fontWeight: "600" }}>Call courier</Text>
-              </Pressable>
+              <Text style={[styles.text, { fontWeight: "600" }]}>Status</Text>
+              {trackError ? <Text style={[styles.sub, { marginTop: 6, color: "#fca5a5" }]}>{trackError}</Text> : null}
+              {trackData?.delivery ? (
+                <>
+                  <Text style={[styles.sub, { marginTop: 6 }]}>Tracking: {trackData.delivery.package_id}</Text>
+                  <Text style={styles.sub}>Status: {trackData.delivery.status}</Text>
+                  <Text style={styles.sub}>Updated: {String(trackData.delivery.updated_at ?? "—").slice(0, 19)}</Text>
+                  {Array.isArray(trackData.timeline) && trackData.timeline.length ? (
+                    <Text style={[styles.sub, { marginTop: 8 }]}>
+                      Latest: {trackData.timeline[trackData.timeline.length - 1]?.label ?? "—"}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={[styles.sub, { marginTop: 6 }]}>
+                  Enter a tracking id and use “Lookup status (API)”. Base URL: {apiBaseUrl}
+                </Text>
+              )}
             </View>
           </View>
         ) : null}

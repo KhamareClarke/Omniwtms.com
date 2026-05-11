@@ -17,6 +17,7 @@ export default function EmpireOsPage() {
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingBacklog, setSendingBacklog] = useState(false);
+  const [actingId, setActingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +39,28 @@ export default function EmpireOsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const actOnRec = async (rec: Rec, action: "accepted" | "dismissed" | "snoozed") => {
+    setActingId(rec.id);
+    const res = await fetch("/api/dashboard/empire-os/recommendations", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recommendation_id: rec.id,
+        action,
+        metadata: { title: rec.title, category: rec.category, severity: rec.severity },
+      }),
+    });
+    const json = await res.json();
+    setActingId(null);
+    if (!res.ok) {
+      toast.error(json.error ?? "Failed to record action");
+      return;
+    }
+    setRecs((prev) => prev.filter((r) => r.id !== rec.id));
+    toast.success(action === "accepted" ? "Accepted" : action === "dismissed" ? "Dismissed" : "Snoozed");
+  };
 
   const sendOne = async (r: Rec) => {
     setSendingId(r.id);
@@ -212,9 +235,32 @@ export default function EmpireOsPage() {
                       {r.category} · {r.severity}
                     </div>
                   </div>
-                  <Button size="sm" variant="secondary" disabled={sendingId === r.id} onClick={() => void sendOne(r)}>
-                    {sendingId === r.id ? "Sending…" : "Send to Empire OS"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={actingId === r.id}
+                      onClick={() => void actOnRec(r, "accepted")}
+                    >
+                      {actingId === r.id ? "Saving…" : "Accept"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={actingId === r.id}
+                      onClick={() => void actOnRec(r, "dismissed")}
+                    >
+                      Dismiss
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={sendingId === r.id}
+                      onClick={() => void sendOne(r)}
+                    >
+                      {sendingId === r.id ? "Sending…" : "Send to Empire OS"}
+                    </Button>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{r.body}</p>
               </div>

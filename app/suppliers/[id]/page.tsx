@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ type Po = {
 };
 
 export default function SupplierDetailPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = String(params?.id ?? "");
   const [data, setData] = useState<any>(null);
@@ -50,6 +52,23 @@ export default function SupplierDetailPage() {
 
   const load = async () => {
     if (!id) return;
+    try {
+      const raw = localStorage.getItem("supplierPortal");
+      const parsed = raw ? (JSON.parse(raw) as { supplier_id?: unknown }) : null;
+      const supplierId = typeof parsed?.supplier_id === "string" ? parsed.supplier_id : "";
+      if (supplierId && supplierId !== id) {
+        router.replace(`/suppliers/${supplierId}`);
+        return;
+      }
+      if (!supplierId) {
+        router.replace("/suppliers/portal/login");
+        return;
+      }
+    } catch {
+      router.replace("/suppliers/portal/login");
+      return;
+    }
+
     const [dRes, skusRes] = await Promise.all([
       fetch(`/api/suppliers/${id}`, { credentials: "include" }),
       fetch("/api/skus", { credentials: "include" }),

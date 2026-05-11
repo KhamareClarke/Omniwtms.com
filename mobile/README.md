@@ -28,4 +28,5 @@ npx expo start
 ## Notes
 
 - Replace API placeholders with real OmniWTMS backend URLs and auth tokens.
+- For local dev against the Next.js app, set Expo env var `EXPO_PUBLIC_API_BASE_URL`, e.g. `http://localhost:3020`.
 - Add native config for Maps/Push/Biometrics per platform before store deployment.

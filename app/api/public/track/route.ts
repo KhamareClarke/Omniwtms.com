@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://qpkaklmbiwitlroykjim.supabase.co";
-const serviceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function stepToLabel(step: string): string {
   const map: Record<string, string> = {
@@ -26,6 +22,10 @@ function stepToLabel(step: string): string {
  */
 export async function GET(request: NextRequest) {
   try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+    }
+
     const trackingNumber = request.nextUrl.searchParams.get("tracking_number")?.trim();
     if (!trackingNumber) {
       return NextResponse.json(
