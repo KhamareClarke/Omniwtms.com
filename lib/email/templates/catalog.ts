@@ -204,4 +204,26 @@ export const EMAIL_TEMPLATE_CATALOG: Record<TemplateId, Builder> = {
 <p style="margin:0 0 12px;">Cold chain alert for <strong>{{packageId}}</strong>: reading <strong>{{reading}}°C</strong> (allowed {{minTemp}}°C – {{maxTemp}}°C).</p>
 <p style="margin:0;">Device: {{deviceId}} · {{occurredAt}}</p>`
   ),
+  "po-sent": S(
+    "Purchase order {{poNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0 0 12px;">A new purchase order <strong>{{poNumber}}</strong> has been issued.</p>
+<p style="margin:0 0 12px;"><strong>Total:</strong> {{amount}}</p>
+<p style="margin:0;">Supplier portal: <a href="{{portalUrl}}" style="color:#3456FF;">{{portalUrl}}</a></p>`
+  ),
+  "delivery-reminder": S(
+    "PO delivery reminder — {{poNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0;">Reminder: purchase order <strong>{{poNumber}}</strong> is approaching delivery date {{deliveryDate}}.</p>`
+  ),
+  "receipt-confirmation": S(
+    "PO receipt confirmation — {{poNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0;">We confirmed receipt for purchase order <strong>{{poNumber}}</strong>.</p>`
+  ),
+  "supplier-invoice-generated": S(
+    "Supplier invoice generated — {{poNumber}}",
+    `<p style="margin:0 0 12px;">Hi {{customerName}},</p>
+<p style="margin:0;">An invoice record was generated for purchase order <strong>{{poNumber}}</strong> (ref {{invoiceReference}}).</p>`
+  ),
 };

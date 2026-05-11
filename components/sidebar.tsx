@@ -269,6 +269,18 @@ export function Sidebar({ className, branding }: SidebarProps) {
           active: pathname === "/dashboard/reports/custom-report",
         },
         {
+          label: "Hazmat inventory",
+          icon: Package,
+          href: "/dashboard/inventory/hazmat",
+          active: pathname === "/dashboard/inventory/hazmat",
+        },
+        {
+          label: "Hazmat check",
+          icon: FileBarChart,
+          href: "/dashboard/orders/hazmat-check",
+          active: pathname === "/dashboard/orders/hazmat-check",
+        },
+        {
           label: "Returns",
           icon: Receipt,
           href: "/dashboard/returns",
@@ -292,6 +304,12 @@ export function Sidebar({ className, branding }: SidebarProps) {
           icon: Store,
           href: "/dashboard/ecommerce/integrations",
           active: pathname === "/dashboard/ecommerce/integrations",
+        },
+        {
+          label: "Suppliers",
+          icon: Store,
+          href: "/suppliers/performance",
+          active: pathname.startsWith("/suppliers"),
         },
       ],
     },

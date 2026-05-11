@@ -70,6 +70,7 @@ export function isTenantMiddlewareSkippedPath(pathname: string): boolean {
   if (pathname.startsWith("/api/cron/billing-monthly")) return true;
   if (pathname.startsWith("/api/cron/billing-overdue")) return true;
   if (pathname.startsWith("/api/cron/ecommerce-sync")) return true;
+  if (pathname.startsWith("/api/cron/suppliers-auto-reorder")) return true;
   if (pathname.startsWith("/api/webhooks/")) return true;
   if (pathname.startsWith("/favicon.ico")) return true;
   return false;

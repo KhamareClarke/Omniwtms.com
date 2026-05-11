@@ -149,6 +149,8 @@ interface Delivery {
     failed_at: string;
   };
   pod_file?: string;
+  has_hazmat?: boolean;
+  requires_signature?: boolean;
 }
 
 // Define icons for completed and pending
@@ -317,6 +319,11 @@ const ShippingLabelDisplay = ({ delivery }: { delivery: Delivery }) => {
           <div>
             <h3 className="text-lg font-bold">Package Details</h3>
             <p className="text-sm text-gray-500">ID: {delivery.package_id}</p>
+            {delivery.has_hazmat ? (
+              <p className="text-xs text-amber-700 font-medium mt-1">
+                Hazardous goods: handle per declaration and PPE guidance.
+              </p>
+            ) : null}
           </div>
           <Badge
             variant={
@@ -395,6 +402,9 @@ const ShippingLabelDisplay = ({ delivery }: { delivery: Delivery }) => {
 
         <div className="mt-4 border-t pt-4">
           <h4 className="font-medium">Receiver's Signature</h4>
+          {delivery.requires_signature ? (
+            <p className="text-xs text-amber-700 mb-2">Signature is mandatory for this delivery.</p>
+          ) : null}
           <div className="mt-2 border-b border-dashed border-gray-400 py-8">
             <p className="text-center text-gray-500 text-sm">Sign here</p>
           </div>

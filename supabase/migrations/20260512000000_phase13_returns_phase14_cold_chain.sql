@@ -49,6 +49,8 @@ ALTER TABLE public.skus ADD COLUMN IF NOT EXISTS temp_max_c numeric;
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS requires_temperature_monitoring boolean NOT NULL DEFAULT false;
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS temp_alert_min_c numeric;
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS temp_alert_max_c numeric;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS has_hazmat boolean NOT NULL DEFAULT false;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS requires_signature boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS public.temperature_readings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

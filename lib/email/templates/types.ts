@@ -44,6 +44,11 @@ export const TEMPLATE_IDS = [
   "refund-processed",
   // Cold chain (1)
   "temperature-deviation",
+  // Suppliers / purchasing (4)
+  "po-sent",
+  "delivery-reminder",
+  "receipt-confirmation",
+  "supplier-invoice-generated",
 ] as const;
 
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
