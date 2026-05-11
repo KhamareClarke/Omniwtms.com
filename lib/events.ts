@@ -22,6 +22,8 @@ export type DeliveryAssignedPayload = {
   courier_name?: string;
   pickup?: string;
   delivery_to?: string;
+  /** When set, listeners (e.g. Empire OS) can scope webhooks to the tenant. */
+  tenant_id?: string | null;
 };
 
 const eventBus = new EventEmitter();

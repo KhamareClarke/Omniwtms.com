@@ -29,6 +29,7 @@ import {
   BarChart3,
   Layers,
   Barcode,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -261,6 +262,12 @@ export function Sidebar({ className, branding }: SidebarProps) {
           icon: BarChart3,
           href: "/dashboard/analytics",
           active: pathname === "/dashboard/analytics",
+        },
+        {
+          label: "Empire OS",
+          icon: Sparkles,
+          href: "/dashboard/empire-os",
+          active: pathname === "/dashboard/empire-os",
         },
         {
           label: "Custom report",

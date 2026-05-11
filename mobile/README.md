@@ -8,11 +8,13 @@ This workspace contains 3 Expo React Native apps:
 
 Each app includes:
 
-- offline-first data queue scaffolding (SQLite + replay)
-- push notification helper
-- biometric auth helper
+- **Courier:** tabbed UI (Home, Stops, Scan, Pay, Chat, More) with mock route, Maps + dialer handoff, scan field, offline queue viewer, biometric login, push registration.
+- **Warehouse:** pick list with scan field + pick toggles, pack/shipment grouping, label print placeholder, settings.
+- **Customer:** guest tracking id, open web track URL, sample ETA/courier row, rating stars, order tab.
+- offline-first data queue scaffolding (SQLite; clear queue for demos)
+- push notification helper (courier)
+- biometric auth helper (courier)
 - dark mode + i18n-ready structure
-- placeholders for camera/GPS/chat/maps integrations
 
 ## Run
 

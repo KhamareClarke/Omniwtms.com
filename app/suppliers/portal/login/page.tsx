@@ -31,9 +31,14 @@ export default function SupplierPortalLoginPage() {
 
   return (
     <div className="min-h-screen grid place-items-center p-6">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Supplier Portal Login</CardTitle>
+          <CardTitle>Supplier portal</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Sign in with the email and password your tenant issued. You must use the same tenant hostname or context as
+            your buyer (OmniWTMS passes <code className="text-xs">x-tenant-id</code> / org session) so the API can
+            resolve your organization.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

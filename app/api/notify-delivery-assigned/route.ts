@@ -27,15 +27,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "delivery_id and package_id required" }, { status: 400 });
     }
 
-    // Internal event architecture: emit for listeners
-    emitDeliveryAssigned({
-      delivery_id: deliveryId,
-      package_id: packageId,
-      courier_name,
-      pickup,
-      delivery_to,
-    });
-
     const clientIp =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
@@ -50,6 +41,16 @@ export async function POST(request: NextRequest) {
       .eq("id", deliveryId)
       .maybeSingle();
     const tenantId = (delRow as { tenant_id?: string | null } | null)?.tenant_id ?? null;
+
+    // Internal event architecture: emit for listeners (after tenant resolved)
+    emitDeliveryAssigned({
+      delivery_id: deliveryId,
+      package_id: packageId,
+      courier_name,
+      pickup,
+      delivery_to,
+      tenant_id: tenantId,
+    });
     const emailOk = await isEmailOutgoingConfigured(tenantId);
     const courierId = (delRow as { courier_id?: string | null } | null)?.courier_id ?? null;
     type CourierRow = { name?: string | null; email?: string | null; phone?: string | null };

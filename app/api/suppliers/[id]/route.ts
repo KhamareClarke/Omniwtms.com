@@ -22,7 +22,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
     const { data: pos } = await supabase
       .from("purchase_orders")
-      .select("id, status, order_date, delivery_date, total_amount")
+      .select(
+        "id, po_number, status, order_date, delivery_date, total_amount, notes, po_items(id, quantity, unit_price, total, skus(name, code))"
+      )
       .eq("tenant_id", t.tenantId)
       .eq("supplier_id", id)
       .order("order_date", { ascending: false })

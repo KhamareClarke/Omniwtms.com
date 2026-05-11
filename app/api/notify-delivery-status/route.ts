@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       new_status: newStatus,
       triggered_by: triggeredBy === "organization" ? "organization" : "courier",
       pod_file: podFile || undefined,
-      metadata: { package_id: packageId },
+      metadata: { package_id: packageId, tenant_id: deliveryTid },
     });
 
     const clientIp = getClientIp(request);

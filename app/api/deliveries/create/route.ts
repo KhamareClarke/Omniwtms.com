@@ -3,6 +3,7 @@ import { sendTemplateEmail } from "@/lib/email/send";
 import { maybeSendTenantSms } from "@/lib/sms/dispatch";
 import { resolveTenantIdOrDefault } from "@/lib/tenants/context";
 import { isEmailOutgoingConfigured } from "@/lib/email/config";
+import { empireOsDispatch, EmpireOSEvents } from "@/lib/integrations/empire-os-dispatch";
 
 /**
  * POST /api/deliveries/create
@@ -58,6 +59,12 @@ export async function POST(request: NextRequest) {
         body: `New delivery ${packageId}. Pickup: ${String(body.pickupAddress || "")}. Open your courier app.`,
       });
     }
+
+    empireOsDispatch(tenantId, EmpireOSEvents.ORDER_SHIPPED, {
+      package_id: packageId,
+      customer_email: customerEmail || null,
+      courier_email: courierEmail || null,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

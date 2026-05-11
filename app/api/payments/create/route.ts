@@ -3,6 +3,7 @@ import { sendTemplateEmail } from "@/lib/email/send";
 import { resolveTenantIdOrDefault } from "@/lib/tenants/context";
 import { isEmailOutgoingConfigured } from "@/lib/email/config";
 import { maybeSendTenantSms } from "@/lib/sms/dispatch";
+import { empireOsDispatch, EmpireOSEvents } from "@/lib/integrations/empire-os-dispatch";
 
 /**
  * POST /api/payments/create
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest) {
       tenantId,
     });
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 500 });
+    if (status === "success") {
+      empireOsDispatch(tenantId, EmpireOSEvents.PERFORMANCE_MILESTONE, {
+        kind: "payment_received",
+        amount: String(body.amount),
+        currency: String(body.currency || "GBP"),
+        customer: String(body.customerName || "Customer"),
+      });
+    }
     const phone = String(body.customerPhone || "").trim();
     if (phone) {
       const line =

@@ -27,3 +27,7 @@ export function getQueuedEvents(): { id: number; event_type: string; payload: st
 export function clearQueuedEvent(id: number) {
   db.runSync("DELETE FROM sync_queue WHERE id = ?", [id]);
 }
+
+export function clearAllQueuedEvents() {
+  db.execSync("DELETE FROM sync_queue");
+}

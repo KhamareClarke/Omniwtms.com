@@ -1,5 +1,7 @@
 import { createAdminServiceClient } from "@/lib/supabase/admin-service";
 
+/** Canonical event strings: see `EmpireOSEvents` in `@/lib/integrations/empire-os-dispatch`. */
+
 export type EmpireEventInput = {
   tenantId: string;
   event: string;

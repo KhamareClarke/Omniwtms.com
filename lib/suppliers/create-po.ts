@@ -1,5 +1,6 @@
 import { createAdminServiceClient } from "@/lib/supabase/admin-service";
 import { sendTemplateEmail } from "@/lib/email/send";
+import { empireOsDispatch, EmpireOSEvents } from "@/lib/integrations/empire-os-dispatch";
 
 export type CreatePOItemInput = {
   sku_id: string;
@@ -166,5 +167,11 @@ export async function autoCreatePOsForLowStock(tenantId: string): Promise<{
     notes: "Auto-generated from low stock reorder point",
   });
   if (!created.ok) return { ok: true, created: 0 };
+  empireOsDispatch(tenantId, EmpireOSEvents.INVENTORY_LOW, {
+    sku_count: low.length,
+    po_id: created.poId,
+    po_number: created.poNumber,
+    supplier_id: supplier.id,
+  });
   return { ok: true, created: 1 };
 }
