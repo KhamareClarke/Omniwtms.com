@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "OmniWTMS Warehouse",
+    "slug": "omniwtms-warehouse",
+    "scheme": "omniwtmswarehouse",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omniwtms.warehouse"
+    },
+    "android": {
+      "package": "com.omniwtms.warehouse"
+    }
+  }
+}

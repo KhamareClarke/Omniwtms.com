@@ -2054,9 +2054,50 @@ export default function CourierContent() {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#3456FF] to-[#8763FF] bg-clip-text text-transparent">
             Welcome back, {courierData?.name}!
           </h1>
-          <p className="text-gray-500">
-            Managing deliveries for {courierData?.email}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-gray-500">Managing deliveries for {courierData?.email}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                if (!courierData?.id) return;
+                await fetch("/api/payroll/clock", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    employee_id: courierData.id,
+                    action: "clock_in",
+                    task_type: "courier_delivery_auto",
+                  }),
+                });
+                toast.success("Clocked in");
+              }}
+            >
+              Clock In
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                if (!courierData?.id) return;
+                await fetch("/api/payroll/clock", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    employee_id: courierData.id,
+                    action: "clock_out",
+                    task_type: "courier_delivery_auto",
+                    break_duration_minutes: 0,
+                  }),
+                });
+                toast.success("Clocked out");
+              }}
+            >
+              Clock Out
+            </Button>
+          </div>
         </div>
 
         {/* Add Barcode Scanner Button */}

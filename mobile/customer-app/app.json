@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "OmniWTMS Customer",
+    "slug": "omniwtms-customer",
+    "scheme": "omniwtmscustomer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omniwtms.customer"
+    },
+    "android": {
+      "package": "com.omniwtms.customer"
+    }
+  }
+}

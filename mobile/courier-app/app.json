@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "OmniWTMS Courier",
+    "slug": "omniwtms-courier",
+    "scheme": "omniwtmscourier",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omniwtms.courier"
+    },
+    "android": {
+      "package": "com.omniwtms.courier"
+    },
+    "plugins": [
+      "expo-local-authentication",
+      "expo-notifications"
+    ]
+  }
+}

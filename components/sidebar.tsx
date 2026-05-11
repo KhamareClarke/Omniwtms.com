@@ -287,6 +287,12 @@ export function Sidebar({ className, branding }: SidebarProps) {
           active: pathname === "/dashboard/returns",
         },
         {
+          label: "Payroll",
+          icon: Users,
+          href: "/dashboard/payroll",
+          active: pathname === "/dashboard/payroll" || pathname === "/dashboard/payroll/clock",
+        },
+        {
           label: "Cold chain",
           icon: Activity,
           href: "/dashboard/cold-chain",
