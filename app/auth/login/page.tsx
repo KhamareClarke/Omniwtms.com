@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { supabase as supabaseBrowser } from "@/lib/auth/SupabaseClient";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -41,11 +40,8 @@ import Footer from "@/components/layout/footer";
 import { WhiteLabelLayout } from "@/components/layout/WhiteLabelLayout";
 import type { PublicTenantBranding } from "@/lib/tenants/branding-types";
 
-// Server-style checks on login only (existing pattern). Dashboard uses anon + RLS via supabaseBrowser.
-const supabaseUrl = "https://qpkaklmbiwitlroykjim.supabase.co";
-const supabaseServiceKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwa2FrbG1iaXdpdGxyb3lramltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgxMzg2MiwiZXhwIjoyMDUyMzg5ODYyfQ.IBTdBXb3hjobEUDeMGRNbRKZoavL0Bvgpyoxb1HHr34";
-const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+// Credential checks use POST /api/auth/validate-login (same Supabase project as server env).
+// Dashboard session uses POST /api/auth/supabase-session-from-org + supabaseBrowser (RLS).
 
 // Animated gradient background component - optimized for performance
 const AnimatedBackground = () => (
@@ -259,39 +255,29 @@ export default function LoginPage() {
     setClientError(""); // Clear previous error
 
     try {
-      // Block courier-only users from signing in as organization (role separation)
-      const { data: courierOnly } = await supabaseService
-        .from("couriers")
-        .select("id")
-        .eq("email", clientFormData.email)
-        .single();
-
-      const { data: orgUser } = await supabaseService
-        .from("clients")
-        .select("id")
-        .eq("email", clientFormData.email)
-        .single();
-
-      if (courierOnly && !orgUser) {
-        setClientError("This email is registered as a courier. Please use the Courier tab to sign in.");
-        setIsLoading(false);
+      const vRes = await fetch("/api/auth/validate-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "client",
+          email: clientFormData.email,
+          password: clientFormData.password,
+        }),
+      });
+      const vJson = await vRes.json().catch(() => ({}));
+      if (!vRes.ok) {
+        setClientError(typeof vJson.error === "string" ? vJson.error : "An error occurred. Please try again.");
         return;
       }
-
-      const { data: client, error } = await supabaseService
-        .from("clients")
-        .select("id, email, company, status, tenant_id")
-        .eq("email", clientFormData.email)
-        .eq("password", clientFormData.password)
-        .single();
-
-      if (error || !client) {
-        setClientError("Incorrect email or password. Please try again.");
-        return;
-      }
-
-      if (client.status !== "active") {
-        setClientError("Account is not active. Please contact support.");
+      const client = vJson.client as {
+        id: string;
+        email: string;
+        company: string;
+        status: string;
+        tenant_id?: string | null;
+      };
+      if (!client?.id) {
+        setClientError("An error occurred. Please try again.");
         return;
       }
 
@@ -329,8 +315,11 @@ export default function LoginPage() {
           refresh_token: sessJson.refresh_token,
         });
       } else {
+        const parts = [sessJson.error, sessJson.detail, sessJson.hint].filter(Boolean);
         toast.warning(
-          "Could not start database session. Dashboard may be empty until this is fixed (Supabase Auth + service role)."
+          parts.length
+            ? String(parts.join(" — "))
+            : "Could not start database session. Check .env.local (Supabase URL, anon key, service role) and Supabase Email auth provider."
         );
       }
 
@@ -352,33 +341,23 @@ export default function LoginPage() {
     setCourierError(""); // Clear previous error
 
     try {
-      // Block organization users from signing in as courier (role separation)
-      const { data: orgUser } = await supabaseService
-        .from("clients")
-        .select("id")
-        .eq("email", courierFormData.email)
-        .single();
-
-      if (orgUser) {
-        setCourierError("This email is registered as an organization. Please use the Organization tab to sign in.");
-        setIsLoading(false);
+      const vRes = await fetch("/api/auth/validate-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "courier",
+          email: courierFormData.email,
+          password: courierFormData.password,
+        }),
+      });
+      const vJson = await vRes.json().catch(() => ({}));
+      if (!vRes.ok) {
+        setCourierError(typeof vJson.error === "string" ? vJson.error : "An error occurred. Please try again.");
         return;
       }
-
-      const { data: courier, error } = await supabaseService
-        .from("couriers")
-        .select("*")
-        .eq("email", courierFormData.email)
-        .eq("password", courierFormData.password)
-        .single();
-
-      if (error || !courier) {
-        setCourierError("Incorrect email or password. Please try again.");
-        return;
-      }
-
-      if (courier.status !== "active") {
-        setCourierError("Account is not active. Please contact support.");
+      const courier = vJson.courier as Record<string, unknown>;
+      if (!courier?.id) {
+        setCourierError("An error occurred. Please try again.");
         return;
       }
 
@@ -408,7 +387,8 @@ export default function LoginPage() {
           refresh_token: cJson.refresh_token,
         });
       } else {
-        toast.warning("Could not start database session for courier.");
+        const parts = [cJson.error, cJson.detail, cJson.hint].filter(Boolean);
+        toast.warning(parts.length ? String(parts.join(" — ")) : "Could not start database session for courier.");
       }
 
       setLoginSuccess(true);
@@ -429,19 +409,23 @@ export default function LoginPage() {
     setCustomerError(""); // Clear previous error
 
     try {
-      const { data: customer, error } = await supabaseService
-        .from("customers")
-        .select("*")
-        .eq("email", customerFormData.email)
-        .single();
-
-      if (error || !customer) {
-        setCustomerError("Incorrect email or password. Please try again.");
+      const vRes = await fetch("/api/auth/validate-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "customer",
+          email: customerFormData.email,
+          password: customerFormData.password,
+        }),
+      });
+      const vJson = await vRes.json().catch(() => ({}));
+      if (!vRes.ok) {
+        setCustomerError(typeof vJson.error === "string" ? vJson.error : "An error occurred. Please try again.");
         return;
       }
-
-      if (customer.password !== customerFormData.password) {
-        setCustomerError("Incorrect password. Please try again.");
+      const customer = vJson.customer as Record<string, unknown>;
+      if (!customer?.id) {
+        setCustomerError("An error occurred. Please try again.");
         return;
       }
 
@@ -471,7 +455,8 @@ export default function LoginPage() {
           refresh_token: cuJson.refresh_token,
         });
       } else {
-        toast.warning("Could not start database session for customer portal.");
+        const parts = [cuJson.error, cuJson.detail, cuJson.hint].filter(Boolean);
+        toast.warning(parts.length ? String(parts.join(" — ")) : "Could not start database session for customer portal.");
       }
 
       setLoginSuccess(true);

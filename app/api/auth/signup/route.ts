@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminServiceClient } from "@/lib/supabase/admin-service";
 import { DEFAULT_TENANT_ID } from "@/lib/tenants/constants";
+import { isValidTenantId } from "@/lib/tenants/context";
 import { sendTemplateEmail } from "@/lib/email/send";
 import { maybeSendTenantSms } from "@/lib/sms/dispatch";
 import { ensureStripeBillingForTenant } from "@/lib/stripe/ensure-tenant-billing";
+import { emitEmpireActivity } from "@/lib/empire-activity";
 
 /**
  * POST /api/auth/signup
@@ -18,7 +20,8 @@ export async function POST(request: NextRequest) {
       .toLowerCase();
     const password = String(body.password || "");
     const company = String(body.company || "").trim();
-    const tenantId = typeof body.tenant_id === "string" && body.tenant_id.trim() ? body.tenant_id.trim() : DEFAULT_TENANT_ID;
+    const rawTenant = typeof body.tenant_id === "string" ? body.tenant_id.trim() : "";
+    const tenantId = isValidTenantId(rawTenant) ? rawTenant : DEFAULT_TENANT_ID;
 
     if (!email || !password || !company) {
       return NextResponse.json({ error: "email, password, and company are required" }, { status: 400 });
@@ -27,6 +30,13 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminServiceClient();
     const { data: existing } = await supabase.from("clients").select("id").eq("email", email).maybeSingle();
     if (existing) {
+      void emitEmpireActivity({
+        event_type: "signup_failed",
+        user_email: email,
+        message: "Account already exists",
+        metadata: { tenant_id: tenantId, company },
+        request,
+      });
       return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
     }
 
@@ -68,6 +78,15 @@ export async function POST(request: NextRequest) {
         body: `Welcome to ${company}. Sign in: ${process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000"}/auth/login`,
       });
     }
+
+    void emitEmpireActivity({
+      event_type: "signup",
+      user_email: email,
+      user_id: inserted?.id,
+      user_name: company,
+      metadata: { tenant_id: tenantId, company },
+      request,
+    });
 
     return NextResponse.json({ ok: true, client_id: inserted?.id });
   } catch (e) {

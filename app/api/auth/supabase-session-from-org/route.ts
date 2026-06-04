@@ -8,18 +8,29 @@ import { isValidTenantId } from "@/lib/tenants/context";
 
 type Body = { email?: string; password?: string; kind?: "client" | "courier" | "customer" };
 
-async function passwordGrant(
-  email: string,
-  password: string
-): Promise<{
+type PasswordGrantOk = {
   access_token: string;
   refresh_token: string;
   expires_in?: number;
   user?: { id: string };
-} | null> {
+};
+
+async function passwordGrant(
+  email: string,
+  password: string
+): Promise<
+  | { ok: true; tokens: PasswordGrantOk }
+  | { ok: false; reason: string; supabaseMessage?: string; httpStatus?: number }
+> {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  if (!rawUrl || !anon) return null;
+  if (!rawUrl || !anon) {
+    return {
+      ok: false,
+      reason: "missing_env",
+      supabaseMessage: "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set for password sign-in.",
+    };
+  }
   const url = rawUrl.replace(/\/$/, "");
   const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -32,14 +43,22 @@ async function passwordGrant(
   });
   const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!res.ok || !data || typeof data.access_token !== "string" || typeof data.refresh_token !== "string") {
-    return null;
+    const msg =
+      (data && typeof data.error_description === "string" && data.error_description) ||
+      (data && typeof data.msg === "string" && data.msg) ||
+      (data && typeof data.error === "string" && data.error) ||
+      `HTTP ${res.status}`;
+    return { ok: false, reason: "password_grant_failed", supabaseMessage: msg, httpStatus: res.status };
   }
   const user = data.user as { id?: string } | undefined;
   return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_in: typeof data.expires_in === "number" ? data.expires_in : undefined,
-    user: user?.id ? { id: user.id } : undefined,
+    ok: true,
+    tokens: {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_in: typeof data.expires_in === "number" ? data.expires_in : undefined,
+      user: user?.id ? { id: user.id } : undefined,
+    },
   };
 }
 
@@ -110,7 +129,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const admin = createAdminServiceClient();
+    let admin: ReturnType<typeof createAdminServiceClient>;
+    try {
+      admin = createAdminServiceClient();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Configuration error";
+      return NextResponse.json(
+        {
+          error: "Supabase admin is not configured",
+          detail: msg,
+          hint: "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local, then restart the dev server.",
+        },
+        { status: 500 }
+      );
+    }
 
     const table = kind === "client" ? "clients" : kind === "courier" ? "couriers" : "customers";
 
@@ -157,7 +189,9 @@ export async function POST(request: NextRequest) {
         ? { tenant_id: tenantId, customer_id: String(row.id) }
         : { tenant_id: tenantId };
 
-    let tokens = await passwordGrant(authEmail, password);
+    let tokens: PasswordGrantOk | null = null;
+    let lastGrant = await passwordGrant(authEmail, password);
+    if (lastGrant.ok) tokens = lastGrant.tokens;
 
     if (!tokens) {
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -186,18 +220,31 @@ export async function POST(request: NextRequest) {
             console.error("updateUserById", updErr);
             return NextResponse.json({ error: "Could not sync auth account" }, { status: 500 });
           }
-          tokens = await passwordGrant(authEmail, password);
+          lastGrant = await passwordGrant(authEmail, password);
+          if (lastGrant.ok) tokens = lastGrant.tokens;
         } else {
           console.error("createUser", createErr);
           return NextResponse.json({ error: "Could not create auth session" }, { status: 500 });
         }
       } else if (created?.user?.id) {
-        tokens = await passwordGrant(authEmail, password);
+        lastGrant = await passwordGrant(authEmail, password);
+        if (lastGrant.ok) tokens = lastGrant.tokens;
       }
     }
 
     if (!tokens) {
-      return NextResponse.json({ error: "Could not obtain session" }, { status: 500 });
+      const detail = !lastGrant.ok ? lastGrant.supabaseMessage : undefined;
+      const hint =
+        !lastGrant.ok && lastGrant.reason === "missing_env"
+          ? "Add NEXT_PUBLIC_SUPABASE_ANON_KEY (and URL) to .env.local."
+          : typeof detail === "string" &&
+              (detail.toLowerCase().includes("email") && detail.toLowerCase().includes("disabled"))
+            ? "In Supabase: Authentication → Providers → Email → enable sign-in with email/password."
+            : undefined;
+      return NextResponse.json(
+        { error: "Could not obtain session", detail, hint },
+        { status: 500 }
+      );
     }
 
     const userId = tokens.user?.id ?? decodeJwtSub(tokens.access_token);
